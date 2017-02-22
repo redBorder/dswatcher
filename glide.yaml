@@ -1,0 +1,6 @@
+package: github.com/redBorder/dynamic-sensors-watcher
+import:
+- package: github.com/confluentinc/confluent-kafka-go
+  version: ~0.9.4-RC1
+  subpackages:
+  - kafka
