@@ -1,0 +1,24 @@
+language: go
+
+branches:
+  only:
+    - master
+    - develop
+
+go:
+  - 1.6.4
+  - 1.7.5
+  - 1.8
+
+install:
+  - go get -v github.com/Masterminds/glide
+  - go get github.com/mattn/goveralls
+  - go get -t ./...
+
+script:
+  - make
+  - make tests
+
+after_success:
+  - make coverage
+  - goveralls -coverprofile=coverage.out -service=travis-ci
