@@ -18,6 +18,7 @@
 package consumer
 
 import (
+	"encoding/binary"
 	"errors"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -34,6 +35,7 @@ type RdKafkaConsumer interface {
 	Events() chan kafka.Event
 	Assign(partitions []kafka.TopicPartition) error
 	Unassign() error
+	Close() error
 }
 
 /////////////////////////
@@ -50,15 +52,18 @@ type KakfaConsumerConfig struct {
 // KafkaConsumer //
 ///////////////////
 
-// KafkaConsumer implements "Consumer" and consumes messages from a Kafka broker
-type KafkaConsumer struct {
+// KafkaFlowConsumer implements "Consumer" and consumes messages from a Kafka broker
+type KafkaFlowConsumer struct {
+	terminate chan struct{}
+
 	*KakfaConsumerConfig
 }
 
-// NewKafkaConsumer creates a new instance of a Kafka consumer and subscribes
+// NewKafkaNetflowConsumer creates a new instance of a Kafka consumer and subscribes
 // to the provided topics
-func NewKafkaConsumer(config *KakfaConsumerConfig) (kc *KafkaConsumer, err error) {
-	kc = &KafkaConsumer{
+func NewKafkaNetflowConsumer(config *KakfaConsumerConfig) (kc *KafkaFlowConsumer, err error) {
+	kc = &KafkaFlowConsumer{
+		terminate:           make(chan struct{}),
 		KakfaConsumerConfig: config,
 	}
 
@@ -72,32 +77,54 @@ func NewKafkaConsumer(config *KakfaConsumerConfig) (kc *KafkaConsumer, err error
 
 // Consume receives events from the kafka broker. "messages" channel receives
 // actual messages and "info" channel receives notifications
-func (kc *KafkaConsumer) Consume() (messages chan []byte, info chan string) {
-	messages = make(chan []byte, 100)
+func (kc *KafkaFlowConsumer) Consume() (messages chan FlowData, info chan string) {
+	messages = make(chan FlowData, 100)
 	info = make(chan string)
 
 	go func() {
-		for ev := range kc.RdConsumer.Events() {
-			switch e := ev.(type) {
-			case kafka.AssignedPartitions:
-				kc.RdConsumer.Assign(e.Partitions)
-				info <- "Partition assignment ocurred"
+	receiving:
+		for {
+			select {
+			case <-kc.terminate:
+				break receiving
 
-			case kafka.RevokedPartitions:
-				kc.RdConsumer.Unassign()
-				info <- "Partition unassign ocurred"
+			case ev := <-kc.RdConsumer.Events():
+				switch e := ev.(type) {
+				case kafka.AssignedPartitions:
+					kc.RdConsumer.Assign(e.Partitions)
+					info <- "Partition assignment ocurred"
 
-			case *kafka.Message:
-				messages <- e.Value
+				case kafka.RevokedPartitions:
+					kc.RdConsumer.Unassign()
+					info <- "Partition unassign ocurred"
 
-			case kafka.Error:
-				info <- "Error: " + e.String()
+				case *kafka.Message:
+					if len(e.Key) != 4 {
+						info <- "Invalid message key"
+						continue
+					}
+					messages <- FlowData{
+						IP:   binary.BigEndian.Uint32(e.Key),
+						Data: e.Value,
+					}
 
-			default:
-				info <- "Unknown event received"
+				case kafka.Error:
+					info <- "Error: " + e.String()
+
+				default:
+					info <- "Unknown event received"
+				}
 			}
 		}
+
+		kc.RdConsumer.Close()
+		info <- "Consumer terminated"
 	}()
 
 	return
+}
+
+// Close terminates the rdkafka consumer
+func (kc *KafkaFlowConsumer) Close() {
+	kc.terminate <- struct{}{}
 }
