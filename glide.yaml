@@ -1,6 +1,20 @@
 package: github.com/redBorder/dynamic-sensors-watcher
 import:
 - package: github.com/confluentinc/confluent-kafka-go
-  version: ~0.9.4-RC1
+  version: ~0.9.4
   subpackages:
   - kafka
+- package: github.com/tehmaze/netflow
+  subpackages:
+  - ipfix
+  - session
+testImport:
+- package: github.com/smartystreets/goconvey
+  version: ~1.6.2
+  subpackages:
+  - convey
+- package: github.com/stretchr/testify
+  version: ~1.1.4
+  subpackages:
+  - assert
+  - mock

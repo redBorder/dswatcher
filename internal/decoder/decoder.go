@@ -15,28 +15,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package decoder
 
-import (
-	"flag"
-	"fmt"
-	"os"
-)
-
-var version string
-
-func printVersion() {
-	fmt.Println(version)
+// NetflowDecoder is an interface for a decoder that obtains a IP and Serial
+// Number from Netflow data
+type NetflowDecoder interface {
+	Decode(ip uint32, data []byte) (uint32, error)
 }
-
-func init() {
-	versionFlag := flag.Bool("version", false, "Show version info")
-	flag.Parse()
-
-	if *versionFlag {
-		printVersion()
-		os.Exit(0)
-	}
-}
-
-func main() {}

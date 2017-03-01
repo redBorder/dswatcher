@@ -17,7 +17,13 @@
 
 package consumer
 
-// Consumer gets messages from a data store
-type Consumer interface {
-	Consume() (messages chan []byte, events chan string)
+// FlowData contains the IP address of the Netflow exporter and the flow itself
+type FlowData struct {
+	IP   uint32
+	Data []byte
+}
+
+// NetflowConsumer gets an IP address and Netflow data from a resource
+type NetflowConsumer interface {
+	Consume() (messages chan FlowData, events chan string)
 }

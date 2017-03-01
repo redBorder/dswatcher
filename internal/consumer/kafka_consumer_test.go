@@ -68,6 +68,11 @@ func (rdkafka *RdConsumerMock) Events() chan kafka.Event {
 	return args.Get(0).(chan kafka.Event)
 }
 
+func (rdkafka *RdConsumerMock) Close() error {
+	args := rdkafka.Called()
+	return args.Error(0)
+}
+
 ///////////////
 // TestEvent //
 ///////////////
@@ -84,7 +89,6 @@ func (e TestEvent) String() string {
 
 func TestConsumer(t *testing.T) {
 	Convey("Given a working consumer", t, func() {
-		info := make(chan kafka.Event, 1)
 		topics := []string{"test"}
 		attributes := &kafka.ConfigMap{}
 
@@ -97,36 +101,57 @@ func TestConsumer(t *testing.T) {
 		rdConsumer.
 			On("SubscribeTopics", topics, mock.AnythingOfType("kafka.RebalanceCb")).
 			Return(nil)
-		rdConsumer.
-			On("Events").
-			Return(info)
 
 		c, err := rdKafka.NewConsumer(attributes)
 		assert.NoError(t, err)
 		assert.Equal(t, rdConsumer, c)
 
-		consumer, err := NewKafkaConsumer(
-			&KakfaConsumerConfig{
+		consumer, err := NewKafkaNetflowConsumer(
+			KakfaConsumerConfig{
 				RdConsumer: rdConsumer,
 				Topics:     topics,
 			})
 		assert.NoError(t, err)
+		assert.NotNil(t, consumer)
+		assert.NotNil(t, consumer.terminate)
 
 		Convey("When a message is received", func() {
-			info <- &kafka.Message{
-				Value:  []byte("payload"),
-				Opaque: struct{}{},
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+
+			events <- &kafka.Message{
+				Key:   []byte{0x00, 0x00, 0x00, 0x00},
+				Value: []byte("payload"),
 			}
 
 			Convey("The message should be consumed", func() {
 				messages, _ := consumer.Consume()
-				data := <-messages
-				So(data, ShouldResemble, []byte("payload"))
+				msg := <-messages
+				So(msg.Data, ShouldResemble, []byte("payload"))
+				rdConsumer.AssertExpectations(t)
+			})
+		})
+
+		Convey("When a message is received without key", func() {
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+
+			events <- &kafka.Message{
+				Value: []byte("payload"),
+			}
+
+			Convey("An error shoud be received", func() {
+				_, info := consumer.Consume()
+				msg := <-info
+				So(msg, ShouldEqual, "Invalid message key")
 				rdConsumer.AssertExpectations(t)
 			})
 		})
 
 		Convey("When a partition is assigned", func() {
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+
 			rdConsumer.
 				On("Assign", mock.AnythingOfType("[]kafka.TopicPartition")).
 				Return(nil)
@@ -141,60 +166,99 @@ func TestConsumer(t *testing.T) {
 					},
 				},
 			}
-			info <- partitions
+			events <- partitions
 
 			Convey("The assignment should be triggered", func() {
 				_, info := consumer.Consume()
-				<-info
+				msg := <-info
+				So(msg, ShouldEqual, "Partition assignment ocurred")
 				rdConsumer.AssertExpectations(t)
 			})
 		})
 
 		Convey("When a partition is unassigned", func() {
-			rdConsumer.
-				On("Unassign").
-				Return(nil)
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Unassign").Return(nil)
 
 			partitions := kafka.RevokedPartitions{}
-			info <- partitions
+			events <- partitions
 
 			Convey("The unassignment should be triggered", func() {
 				_, info := consumer.Consume()
-				<-info
+				msg := <-info
+				So(msg, ShouldEqual, "Partition unassign ocurred")
 				rdConsumer.AssertExpectations(t)
 			})
 		})
 
 		Convey("When an error ocurred", func() {
-			info <- kafka.Error{}
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+
+			events <- kafka.Error{}
 
 			Convey("The error should be reported", func() {
 				_, info := consumer.Consume()
-				err := <-info
-				So(err, ShouldEqual, "Error: Success")
+				msg := <-info
+				So(msg, ShouldEqual, "Error: Success")
 				rdConsumer.AssertExpectations(t)
 			})
 		})
 
 		Convey("When an unknown event ocurrs", func() {
-			info <- TestEvent{}
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+
+			events <- TestEvent{}
 
 			Convey("The event should be reported", func() {
 				_, info := consumer.Consume()
-				err := <-info
-				So(err, ShouldEqual, "Unknown event received")
+				msg := <-info
+				So(msg, ShouldEqual, "Unknown event received")
 				rdConsumer.AssertExpectations(t)
 			})
 		})
 	})
+}
 
+func TestCloseConsumer(t *testing.T) {
+	Convey("Given a running consummer", t, func() {
+		rdConsumer := new(RdConsumerMock)
+		events := make(chan kafka.Event, 1)
+
+		rdConsumer.On("Events").Return(events)
+		rdConsumer.On("Close").Return(nil)
+
+		consumer := KafkaFlowConsumer{
+			terminate: make(chan struct{}),
+			KakfaConsumerConfig: KakfaConsumerConfig{
+				RdConsumer: rdConsumer,
+			},
+		}
+
+		_, info := consumer.Consume()
+
+		Convey("When close is called", func() {
+			consumer.Close()
+			msg := <-info
+			So(msg, ShouldEqual, "Consumer terminated")
+
+			Convey("The consumer should be terminated", func() {
+				rdConsumer.AssertExpectations(t)
+			})
+		})
+	})
+}
+
+func TestConsumerFail(t *testing.T) {
 	Convey("Given a configuration without topics", t, func() {
 		Convey("When a consumer is created", func() {
 			rdKafka := new(RdKafkaMock)
 			rdConsumer := new(RdConsumerMock)
 
 			attributes := &kafka.ConfigMap{}
-			config := &KakfaConsumerConfig{
+			config := KakfaConsumerConfig{
 				RdConsumer: rdConsumer,
 				Topics:     []string{},
 			}
@@ -211,7 +275,7 @@ func TestConsumer(t *testing.T) {
 			assert.Equal(t, rdConsumer, c)
 
 			Convey("Should fail", func() {
-				consumer, err := NewKafkaConsumer(config)
+				consumer, err := NewKafkaNetflowConsumer(config)
 				So(err, ShouldNotBeNil)
 				So(consumer, ShouldBeNil)
 			})

@@ -1,10 +1,22 @@
-hash: 6004fb6d61f729ea723cf284c50d3bf51f950cf57dfdf5be0852122fa6976706
-updated: 2017-02-22T10:47:17.46496028+01:00
+hash: c1d15dc15f5f89042a0f323b8367d5942fbb1975b1f11261afbf6106f2358419
+updated: 2017-03-01T14:18:14.813273794+01:00
 imports:
 - name: github.com/confluentinc/confluent-kafka-go
   version: a9b5c269c66e9a2eb5f195563b2f01e65a84c527
   subpackages:
   - kafka
+- name: github.com/tehmaze/netflow
+  version: 9fe95bba7b553cefdc996a4ea5eae8f0166dddb1
+  subpackages:
+  - ipfix
+  - netflow1
+  - netflow5
+  - netflow6
+  - netflow7
+  - netflow9
+  - read
+  - session
+  - translate
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
