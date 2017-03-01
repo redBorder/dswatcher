@@ -17,6 +17,26 @@
 
 package main
 
-func main() {
+import (
+	"flag"
+	"fmt"
+	"os"
+)
 
+var version string
+
+func printVersion() {
+	fmt.Println(version)
 }
+
+func init() {
+	versionFlag := flag.Bool("version", false, "Show version info")
+	flag.Parse()
+
+	if *versionFlag {
+		printVersion()
+		os.Exit(0)
+	}
+}
+
+func main() {}
