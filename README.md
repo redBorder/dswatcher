@@ -39,6 +39,8 @@ And then:
 Usage of dynamic-sensors-watcher:
 
 ```
+--version
+    Show version info
 --config string
     Config file
 --debug
@@ -50,7 +52,7 @@ Usage of dynamic-sensors-watcher:
 | Version  | Feature             | Status    |
 |----------|---------------------|-----------|
 | 0.1      | Kafka consumer      | Done      |
-| 0.2      | Netflow decoder     | _Pending_ |
+| 0.2      | Netflow decoder     | Done      |
 | 0.3      | Chef checker        | _Pending_ |
 | 0.4      | Chef updater        | _Pending_ |
 | 0.5      | Instrumentation     | _Pending_ |
