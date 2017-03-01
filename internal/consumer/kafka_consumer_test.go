@@ -107,7 +107,7 @@ func TestConsumer(t *testing.T) {
 		assert.Equal(t, rdConsumer, c)
 
 		consumer, err := NewKafkaNetflowConsumer(
-			&KakfaConsumerConfig{
+			KakfaConsumerConfig{
 				RdConsumer: rdConsumer,
 				Topics:     topics,
 			})
@@ -232,7 +232,7 @@ func TestCloseConsumer(t *testing.T) {
 
 		consumer := KafkaFlowConsumer{
 			terminate: make(chan struct{}),
-			KakfaConsumerConfig: &KakfaConsumerConfig{
+			KakfaConsumerConfig: KakfaConsumerConfig{
 				RdConsumer: rdConsumer,
 			},
 		}
@@ -258,7 +258,7 @@ func TestConsumerFail(t *testing.T) {
 			rdConsumer := new(RdConsumerMock)
 
 			attributes := &kafka.ConfigMap{}
-			config := &KakfaConsumerConfig{
+			config := KakfaConsumerConfig{
 				RdConsumer: rdConsumer,
 				Topics:     []string{},
 			}

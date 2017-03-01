@@ -56,12 +56,12 @@ type KakfaConsumerConfig struct {
 type KafkaFlowConsumer struct {
 	terminate chan struct{}
 
-	*KakfaConsumerConfig
+	KakfaConsumerConfig
 }
 
 // NewKafkaNetflowConsumer creates a new instance of a Kafka consumer and subscribes
 // to the provided topics
-func NewKafkaNetflowConsumer(config *KakfaConsumerConfig) (kc *KafkaFlowConsumer, err error) {
+func NewKafkaNetflowConsumer(config KakfaConsumerConfig) (kc *KafkaFlowConsumer, err error) {
 	kc = &KafkaFlowConsumer{
 		terminate:           make(chan struct{}),
 		KakfaConsumerConfig: config,
