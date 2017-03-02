@@ -18,25 +18,122 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
-	"fmt"
+	"io/ioutil"
+	"net"
 	"os"
+	"sync"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/decoder"
 )
 
 var version string
-
-func printVersion() {
-	fmt.Println(version)
-}
+var configFile string
 
 func init() {
 	versionFlag := flag.Bool("version", false, "Show version info")
+	debugFlag := flag.Bool("debug", false, "Show debug info")
+	configFlag := flag.String("config", "", "Application configuration file")
 	flag.Parse()
 
 	if *versionFlag {
-		printVersion()
+		PrintVersion()
 		os.Exit(0)
 	}
+
+	if len(*configFlag) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if *debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	configFile = *configFlag
 }
 
-func main() {}
+func main() {
+	////////////////////
+	// Configuration //
+	////////////////////
+
+	rawConfig, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	config, err := ParseConfig(rawConfig)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	//////////////////////
+	// Netflow decoder //
+	//////////////////////
+
+	decoderConfig := decoder.Netflow10DecoderConfig{
+		ElementID: uint16(config.Decoder.ElementID),
+	}
+	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
+
+	////////////////////
+	// Kafka consumer //
+	////////////////////
+
+	consumerConfig, err := BootstrapRdKafka(
+		config.Broker.Address,
+		config.Broker.ConsumerGroup,
+		config.Broker.Topics)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	kafkaConsumer, err := consumer.NewKafkaNetflowConsumer(consumerConfig)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	messages, events := kafkaConsumer.Consume()
+	defer kafkaConsumer.Close()
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Main loop
+	//////////////////////////////////////////////////////////////////////////////
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		for message := range messages {
+			deviceID, err := nfDecoder.Decode(message.IP, message.Data)
+			if err != nil {
+				logrus.Errorln(err)
+				continue
+			}
+
+			ip := make(net.IP, 4)
+			binary.BigEndian.PutUint32(ip, message.IP)
+
+			if deviceID == 0 {
+				logrus.Debugf("Message without Device ID from %s ignored", ip.String())
+				continue
+			}
+
+			logrus.Infof("Found sensor with Device ID %d on %s", deviceID, ip.String())
+		}
+		wg.Done()
+	}()
+
+	go func() {
+		for event := range events {
+			logrus.Debugln(event)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+	logrus.Infoln("Bye bye...")
+}
