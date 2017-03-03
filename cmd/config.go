@@ -33,6 +33,14 @@ type DynamicSensorsWatcherConfig struct {
 	Decoder struct {
 		ElementID int `yaml:"element_id"`
 	}
+	Updater struct {
+		URL            string `yaml:"chef_server_url"`
+		Key            string `yaml:"client_key"`
+		NodeName       string `yaml:"node_name"`
+		Path           string `yaml:"attribute_path"`
+		UpdateInterval int64  `yaml:"update_interval_s"`
+		FetchInterval  int64  `yaml:"fetch_interval_s"`
+	}
 }
 
 // ParseConfig parse a YAML formatted string and returns a
