@@ -8,6 +8,8 @@ import:
   subpackages:
   - ipfix
   - session
+- package: github.com/go-chef/chef
+  version: a27a34ded3f4ab05bc5c4def0f61eb10272cc246
 testImport:
 - package: github.com/smartystreets/goconvey
   version: ~1.6.2
