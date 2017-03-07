@@ -57,6 +57,5 @@ Usage of dynamic-sensors-watcher:
 |----------|---------------------|-----------|
 | 0.1      | Kafka consumer      | Done      |
 | 0.2      | Netflow decoder     | Done      |
-| 0.3      | Chef checker        | _Pending_ |
-| 0.4      | Chef updater        | _Pending_ |
+| 0.4      | Chef updater        | Done      |
 | 0.5      | Instrumentation     | _Pending_ |
