@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.org/redBorder/dynamic-sensors-watcher.svg?branch=master)](https://travis-ci.org/redBorder/dynamic-sensors-watcher)
+[![Coverage Status](https://coveralls.io/repos/github/redBorder/dynamic-sensors-watcher/badge.svg?branch=master)](https://coveralls.io/github/redBorder/dynamic-sensors-watcher?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/redBorder/dynamic-sensors-watcher)](https://goreportcard.com/report/github.com/redBorder/dynamic-sensors-watcher)
+
 # dynamic-sensors-watcher
 
 ## Overview
@@ -53,6 +57,5 @@ Usage of dynamic-sensors-watcher:
 |----------|---------------------|-----------|
 | 0.1      | Kafka consumer      | Done      |
 | 0.2      | Netflow decoder     | Done      |
-| 0.3      | Chef checker        | _Pending_ |
-| 0.4      | Chef updater        | _Pending_ |
+| 0.4      | Chef updater        | Done      |
 | 0.5      | Instrumentation     | _Pending_ |

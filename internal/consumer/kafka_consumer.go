@@ -77,9 +77,9 @@ func NewKafkaNetflowConsumer(config KakfaConsumerConfig) (kc *KafkaFlowConsumer,
 
 // Consume receives events from the kafka broker. "messages" channel receives
 // actual messages and "info" channel receives notifications
-func (kc *KafkaFlowConsumer) Consume() (messages chan FlowData, info chan string) {
-	messages = make(chan FlowData, 100)
-	info = make(chan string)
+func (kc *KafkaFlowConsumer) Consume() (chan FlowData, chan string) {
+	messages := make(chan FlowData)
+	info := make(chan string)
 
 	go func() {
 	receiving:
@@ -92,15 +92,18 @@ func (kc *KafkaFlowConsumer) Consume() (messages chan FlowData, info chan string
 				switch e := ev.(type) {
 				case kafka.AssignedPartitions:
 					kc.RdConsumer.Assign(e.Partitions)
-					info <- "Partition assignment ocurred"
+					info <- e.String()
 
 				case kafka.RevokedPartitions:
 					kc.RdConsumer.Unassign()
-					info <- "Partition unassign ocurred"
+					info <- e.String()
+
+				case kafka.Error:
+					info <- "Error: " + e.String()
 
 				case *kafka.Message:
 					if len(e.Key) != 4 {
-						info <- "Invalid message key"
+						info <- "Ignored message: Invalid message key"
 						continue
 					}
 					messages <- FlowData{
@@ -108,23 +111,23 @@ func (kc *KafkaFlowConsumer) Consume() (messages chan FlowData, info chan string
 						Data: e.Value,
 					}
 
-				case kafka.Error:
-					info <- "Error: " + e.String()
-
 				default:
-					info <- "Unknown event received"
+					info <- e.String()
 				}
 			}
 		}
 
 		kc.RdConsumer.Close()
-		info <- "Consumer terminated"
+		close(info)
+		close(messages)
+		close(kc.terminate)
 	}()
 
-	return
+	return messages, info
 }
 
 // Close terminates the rdkafka consumer
 func (kc *KafkaFlowConsumer) Close() {
 	kc.terminate <- struct{}{}
+	<-kc.terminate
 }

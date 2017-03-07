@@ -80,7 +80,7 @@ func (rdkafka *RdConsumerMock) Close() error {
 type TestEvent struct{}
 
 func (e TestEvent) String() string {
-	return "TestString"
+	return "Unknown event"
 }
 
 //////////////////
@@ -118,6 +118,7 @@ func TestConsumer(t *testing.T) {
 		Convey("When a message is received", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
 
 			events <- &kafka.Message{
 				Key:   []byte{0x00, 0x00, 0x00, 0x00},
@@ -128,6 +129,7 @@ func TestConsumer(t *testing.T) {
 				messages, _ := consumer.Consume()
 				msg := <-messages
 				So(msg.Data, ShouldResemble, []byte("payload"))
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})
@@ -135,6 +137,7 @@ func TestConsumer(t *testing.T) {
 		Convey("When a message is received without key", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
 
 			events <- &kafka.Message{
 				Value: []byte("payload"),
@@ -143,7 +146,8 @@ func TestConsumer(t *testing.T) {
 			Convey("An error shoud be received", func() {
 				_, info := consumer.Consume()
 				msg := <-info
-				So(msg, ShouldEqual, "Invalid message key")
+				So(msg, ShouldEqual, "Ignored message: Invalid message key")
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})
@@ -151,6 +155,7 @@ func TestConsumer(t *testing.T) {
 		Convey("When a partition is assigned", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
 
 			rdConsumer.
 				On("Assign", mock.AnythingOfType("[]kafka.TopicPartition")).
@@ -171,7 +176,8 @@ func TestConsumer(t *testing.T) {
 			Convey("The assignment should be triggered", func() {
 				_, info := consumer.Consume()
 				msg := <-info
-				So(msg, ShouldEqual, "Partition assignment ocurred")
+				So(msg, ShouldEqual, "AssignedPartitions: [test[46]@1000]")
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})
@@ -180,6 +186,7 @@ func TestConsumer(t *testing.T) {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
 			rdConsumer.On("Unassign").Return(nil)
+			rdConsumer.On("Close").Return(nil)
 
 			partitions := kafka.RevokedPartitions{}
 			events <- partitions
@@ -187,7 +194,8 @@ func TestConsumer(t *testing.T) {
 			Convey("The unassignment should be triggered", func() {
 				_, info := consumer.Consume()
 				msg := <-info
-				So(msg, ShouldEqual, "Partition unassign ocurred")
+				So(msg, ShouldEqual, "RevokedPartitions: []")
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})
@@ -195,6 +203,7 @@ func TestConsumer(t *testing.T) {
 		Convey("When an error ocurred", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
 
 			events <- kafka.Error{}
 
@@ -202,6 +211,7 @@ func TestConsumer(t *testing.T) {
 				_, info := consumer.Consume()
 				msg := <-info
 				So(msg, ShouldEqual, "Error: Success")
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})
@@ -209,42 +219,15 @@ func TestConsumer(t *testing.T) {
 		Convey("When an unknown event ocurrs", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
 
 			events <- TestEvent{}
 
 			Convey("The event should be reported", func() {
 				_, info := consumer.Consume()
 				msg := <-info
-				So(msg, ShouldEqual, "Unknown event received")
-				rdConsumer.AssertExpectations(t)
-			})
-		})
-	})
-}
-
-func TestCloseConsumer(t *testing.T) {
-	Convey("Given a running consummer", t, func() {
-		rdConsumer := new(RdConsumerMock)
-		events := make(chan kafka.Event, 1)
-
-		rdConsumer.On("Events").Return(events)
-		rdConsumer.On("Close").Return(nil)
-
-		consumer := KafkaFlowConsumer{
-			terminate: make(chan struct{}),
-			KakfaConsumerConfig: KakfaConsumerConfig{
-				RdConsumer: rdConsumer,
-			},
-		}
-
-		_, info := consumer.Consume()
-
-		Convey("When close is called", func() {
-			consumer.Close()
-			msg := <-info
-			So(msg, ShouldEqual, "Consumer terminated")
-
-			Convey("The consumer should be terminated", func() {
+				So(msg, ShouldEqual, "Unknown event")
+				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
 		})

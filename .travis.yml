@@ -35,3 +35,12 @@ script:
 after_success:
   - make coverage
   - goveralls -coverprofile=coverage.out -service=travis-ci
+
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: MfIugUVd/0daZpIX/72DN+G9kBfqOogtBM+/wR75B9LOumixou7PEI/QGCxyI5AdsR95gOt/nn++isNx1Ubi7lKNaYCvnBhCf4yHdcunigQ42XUH+TfRPazvFdUOE4AV1aNfbxyGGSRGLxqDxe4MNasVf7IU47WRz/mn+1wiSfdIddlMHH6EEFoEZ2PODi/s+U38+40NaOA1lV2tfncMZOEqA1NejpTuARybbMe/x1Tw0K2mn/QZ9PoyiqTmXEWhOjYCaAHePFWYwDJQ5sfTIRun4j/mYlvdPWvrJpKQuWCabTu+UFvnGU7ySaYiZBrMCJVx1UONVX05odivouMPUZ804k2yBjWPHnTbrAM33wWoNkGMT6cI/hEnAgRjEYPsDdDhp3uT7Qsz7VVrOpyc8oDbpbs1B9BC5N1wbGObS2DwqNLm5n5WgQnDPqsVfEx0Hewkww/L0kj0eMbWYhZy4cEpnfxLZO8bhY7i6s2ZaNWFN6awWFibWCIeJsOYDYoWpnhrXpAtI2KO9z41+BKXg6MPvH9HJqOVgf4+ObRRDUDovebd/wylJHLdZ1BmYM4B9xRYQ4z/JybF74aw/U2dcTuNoUBPlwk6n9+uqgmeyS+n9B1kYOGB2jE5gCG5osoVd/kGHckbiIe4b+G6CxGcYEzQd24LarCWLd0NY64PbvM=
+  file: dynamic-sensors-watcher
+  on:
+    tags: true

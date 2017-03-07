@@ -18,25 +18,172 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
-	"fmt"
+	"io/ioutil"
+	"net"
 	"os"
+	"sync"
+	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/decoder"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/updater"
 )
 
 var version string
-
-func printVersion() {
-	fmt.Println(version)
-}
+var configFile string
 
 func init() {
 	versionFlag := flag.Bool("version", false, "Show version info")
+	debugFlag := flag.Bool("debug", false, "Show debug info")
+	configFlag := flag.String("config", "", "Application configuration file")
 	flag.Parse()
 
 	if *versionFlag {
-		printVersion()
+		PrintVersion()
 		os.Exit(0)
 	}
+
+	if len(*configFlag) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if *debugFlag {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	configFile = *configFlag
 }
 
-func main() {}
+func main() {
+	////////////////////
+	// Configuration //
+	////////////////////
+
+	rawConfig, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	config, err := ParseConfig(rawConfig)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	//////////////////////
+	// Netflow decoder //
+	//////////////////////
+
+	decoderConfig := decoder.Netflow10DecoderConfig{
+		ElementID: uint16(config.Decoder.ElementID),
+	}
+	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
+
+	///////////////////
+	// Chef updater //
+	///////////////////
+
+	lastUpdated := make(map[uint32]time.Time)
+
+	key, err := ioutil.ReadFile(config.Updater.Key)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
+		URL:  config.Updater.URL,
+		Key:  string(key),
+		Name: config.Updater.NodeName,
+		Path: config.Updater.Path,
+	})
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	err = chefUpdater.FetchNodes()
+
+	ticker := time.NewTicker(time.Duration(config.Updater.FetchInterval) * time.Second)
+	go func() {
+		for range ticker.C {
+			err = chefUpdater.FetchNodes()
+			if err != nil {
+				logrus.Warn(err)
+			}
+
+			logrus.Debug("Updated sensors db")
+		}
+	}()
+
+	////////////////////
+	// Kafka consumer //
+	////////////////////
+
+	consumerConfig, err := BootstrapRdKafka(
+		config.Broker.Address,
+		config.Broker.ConsumerGroup,
+		config.Broker.Topics)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	kafkaConsumer, err := consumer.NewKafkaNetflowConsumer(consumerConfig)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	messages, events := kafkaConsumer.Consume()
+	defer kafkaConsumer.Close()
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Main loop
+	//////////////////////////////////////////////////////////////////////////////
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+	go func() {
+		for message := range messages {
+			deviceID, err := nfDecoder.Decode(message.IP, message.Data)
+			if err != nil {
+				logrus.Errorln(err)
+				continue
+			}
+
+			ip := make(net.IP, 4)
+			binary.BigEndian.PutUint32(ip, message.IP)
+
+			if deviceID == 0 {
+				continue
+			}
+
+			err = chefUpdater.UpdateNode(ip, deviceID)
+			if err != nil {
+				logrus.Warn("Error: " + err.Error())
+				continue
+			}
+
+			if time.Since(lastUpdated[deviceID]) <
+				time.Duration(config.Updater.UpdateInterval)*time.Second {
+				continue
+			}
+
+			lastUpdated[deviceID] = time.Now()
+			logrus.Infof("Updated sensor [IP: %s DEVICE_ID: %d]", ip.String(), deviceID)
+		}
+
+		wg.Done()
+	}()
+
+	go func() {
+		for event := range events {
+			logrus.Debugln(event)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	logrus.Infoln("Bye bye...")
+}
