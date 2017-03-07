@@ -24,10 +24,12 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
 	"github.com/redBorder/dynamic-sensors-watcher/internal/decoder"
+	"github.com/redBorder/dynamic-sensors-watcher/internal/updater"
 )
 
 var version string
@@ -80,6 +82,41 @@ func main() {
 	}
 	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
 
+	///////////////////
+	// Chef updater //
+	///////////////////
+
+	lastUpdated := make(map[uint32]time.Time)
+
+	key, err := ioutil.ReadFile(config.Updater.Key)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
+		URL:  config.Updater.URL,
+		Key:  string(key),
+		Name: config.Updater.NodeName,
+		Path: config.Updater.Path,
+	})
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	err = chefUpdater.FetchNodes()
+
+	ticker := time.NewTicker(time.Duration(config.Updater.FetchInterval) * time.Second)
+	go func() {
+		for range ticker.C {
+			err = chefUpdater.FetchNodes()
+			if err != nil {
+				logrus.Warn(err)
+			}
+
+			logrus.Debug("Updated sensors db")
+		}
+	}()
+
 	////////////////////
 	// Kafka consumer //
 	////////////////////
@@ -118,12 +155,24 @@ func main() {
 			binary.BigEndian.PutUint32(ip, message.IP)
 
 			if deviceID == 0 {
-				logrus.Debugf("Message without Device ID from %s ignored", ip.String())
 				continue
 			}
 
-			logrus.Infof("Found sensor with Device ID %d on %s", deviceID, ip.String())
+			err = chefUpdater.UpdateNode(ip, deviceID)
+			if err != nil {
+				logrus.Warn("Error: " + err.Error())
+				continue
+			}
+
+			if time.Since(lastUpdated[deviceID]) <
+				time.Duration(config.Updater.UpdateInterval)*time.Second {
+				continue
+			}
+
+			lastUpdated[deviceID] = time.Now()
+			logrus.Infof("Updated sensor [IP: %s DEVICE_ID: %d]", ip.String(), deviceID)
 		}
+
 		wg.Done()
 	}()
 
@@ -135,5 +184,6 @@ func main() {
 	}()
 
 	wg.Wait()
+
 	logrus.Infoln("Bye bye...")
 }
