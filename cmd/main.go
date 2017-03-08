@@ -112,8 +112,6 @@ func main() {
 			if err != nil {
 				logrus.Warn(err)
 			}
-
-			logrus.Debug("Updated sensors db")
 		}
 	}()
 
@@ -145,7 +143,7 @@ func main() {
 	wg.Add(2)
 	go func() {
 		for message := range messages {
-			deviceID, err := nfDecoder.Decode(message.IP, message.Data)
+			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln(err)
 				continue
@@ -155,10 +153,11 @@ func main() {
 			binary.BigEndian.PutUint32(ip, message.IP)
 
 			if deviceID == 0 {
+				logrus.Debugf("Message without Device ID from: %s", ip.String())
 				continue
 			}
 
-			err = chefUpdater.UpdateNode(ip, deviceID)
+			err = chefUpdater.UpdateNode(ip, deviceID, obsID)
 			if err != nil {
 				logrus.Warn("Error: " + err.Error())
 				continue
@@ -170,7 +169,7 @@ func main() {
 			}
 
 			lastUpdated[deviceID] = time.Now()
-			logrus.Infof("Updated sensor [IP: %s DEVICE_ID: %d]", ip.String(), deviceID)
+			logrus.Infof("Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]", ip.String(), deviceID, obsID)
 		}
 
 		wg.Done()

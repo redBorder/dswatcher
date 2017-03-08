@@ -107,7 +107,7 @@ func (kc *KafkaFlowConsumer) Consume() (chan FlowData, chan string) {
 						continue
 					}
 					messages <- FlowData{
-						IP:   binary.BigEndian.Uint32(e.Key),
+						IP:   binary.LittleEndian.Uint32(e.Key),
 						Data: e.Value,
 					}
 
