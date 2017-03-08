@@ -128,7 +128,7 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 	}
 
 	attributes["ipaddress"] = address.String()
-	attributes["observation_domain_id"] = strconv.FormatUint(uint64(obsID), 10)
+	attributes["observation_id"] = strconv.FormatUint(uint64(obsID), 10)
 
 	cu.client.Nodes.Put(node)
 	if err != nil {
