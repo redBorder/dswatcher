@@ -169,7 +169,7 @@ func main() {
 			}
 
 			lastUpdated[deviceID] = time.Now()
-			logrus.Infof("Updated sensor [IP: %s DEVICE_ID: %d]", ip.String(), deviceID)
+			logrus.Infof("Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]", ip.String(), deviceID, obsID)
 		}
 
 		wg.Done()
