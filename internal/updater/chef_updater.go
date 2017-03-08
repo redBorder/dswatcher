@@ -119,7 +119,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 // UpdateNode gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID uint32) error {
+func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error {
 	node := cu.nodes[deviceID]
 
 	attributes, err := getAttributes(node.NormalAttributes, cu.Path)
@@ -128,6 +128,7 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID uint32) error {
 	}
 
 	attributes["ipaddress"] = address.String()
+	attributes["observation_domain_id"] = strconv.FormatUint(uint64(obsID), 10)
 
 	cu.client.Nodes.Put(node)
 	if err != nil {

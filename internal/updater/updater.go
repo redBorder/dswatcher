@@ -20,5 +20,5 @@ package updater
 // Updater is an interface for an updater that adds an IP address to a sensors
 // information object.
 type Updater interface {
-	Update(ip uint32, deviceID uint32) error
+	Update(ip uint32, deviceID, obsID uint32) error
 }

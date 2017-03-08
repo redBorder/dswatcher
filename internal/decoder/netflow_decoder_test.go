@@ -59,10 +59,11 @@ func TestDecoder(t *testing.T) {
 				0x00, 0x00, 0x00, 0x2a, // FlowExporter: 42
 			}
 
-			Convey("The id should be decoded", func() {
-				id, err := decoder.Decode(3232235777, data)
+			Convey("The id and observation domain ID should be decoded", func() {
+				id, obsID, err := decoder.Decode(3232235777, data)
 				So(err, ShouldBeNil)
 				So(id, ShouldEqual, 42)
+				So(obsID, ShouldEqual, 10)
 			})
 		})
 
@@ -97,9 +98,10 @@ func TestDecoder(t *testing.T) {
 			}
 
 			Convey("The retuned ID should be zero", func() {
-				id, err := decoder.Decode(3232235777, data)
+				id, obsID, err := decoder.Decode(3232235777, data)
 				So(err, ShouldBeNil)
 				So(id, ShouldEqual, 0)
+				So(obsID, ShouldEqual, 10)
 			})
 		})
 
@@ -146,7 +148,7 @@ func TestDecoder(t *testing.T) {
 			}
 
 			Convey("Should error", func() {
-				_, err := decoder.Decode(3232235777, data)
+				_, _, err := decoder.Decode(3232235777, data)
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldEqual, "Invalid message received: Message is not NF10/IPFIX")
 			})
@@ -156,7 +158,7 @@ func TestDecoder(t *testing.T) {
 			data := []byte{0xca, 0xfe, 0xfa, 0xba, 0xda}
 
 			Convey("Should error", func() {
-				_, err := decoder.Decode(3232235777, data)
+				_, _, err := decoder.Decode(3232235777, data)
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldEqual, "Error decoding packet: netflow: unsupported version 51966")
 			})

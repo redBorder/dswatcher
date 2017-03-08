@@ -57,7 +57,7 @@ func NewNetflow10Decoder(config Netflow10DecoderConfig) *Netflow10Decoder {
 // ever IP address so devices using different IP address can reuse templates.
 // Once a NF10/IPFIX packet is decoded, Decode tries to find a device ID.
 // If no device ID has been found the returned value is zero.
-func (nd Netflow10Decoder) Decode(ip uint32, data []byte) (uint32, error) {
+func (nd Netflow10Decoder) Decode(ip uint32, data []byte) (uint32, uint32, error) {
 	decoder, found := nd.d[ip]
 	if !found {
 		decoder = netflow.NewDecoder(session.New())
@@ -66,23 +66,23 @@ func (nd Netflow10Decoder) Decode(ip uint32, data []byte) (uint32, error) {
 
 	m, err := decoder.Read(bytes.NewBuffer(data))
 	if err != nil {
-		return 0, errors.New("Error decoding packet: " + err.Error())
+		return 0, 0, errors.New("Error decoding packet: " + err.Error())
 	}
 
 	p, ok := m.(*ipfix.Message)
 	if !ok {
-		return 0, errors.New("Invalid message received: Message is not NF10/IPFIX")
+		return 0, 0, errors.New("Invalid message received: Message is not NF10/IPFIX")
 	}
 
 	for _, ds := range p.DataSets {
 		for _, record := range ds.Records {
 			for _, field := range record.Fields {
 				if field.Translated.InformationElementID == nd.ElementID {
-					return field.Translated.Value.(uint32), nil
+					return field.Translated.Value.(uint32), p.Header.ObservationDomainID, nil
 				}
 			}
 		}
 	}
 
-	return 0, nil
+	return 0, p.Header.ObservationDomainID, nil
 }

@@ -143,7 +143,7 @@ func main() {
 	wg.Add(2)
 	go func() {
 		for message := range messages {
-			deviceID, err := nfDecoder.Decode(message.IP, message.Data)
+			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln(err)
 				continue
@@ -157,7 +157,7 @@ func main() {
 				continue
 			}
 
-			err = chefUpdater.UpdateNode(ip, deviceID)
+			err = chefUpdater.UpdateNode(ip, deviceID, obsID)
 			if err != nil {
 				logrus.Warn("Error: " + err.Error())
 				continue
