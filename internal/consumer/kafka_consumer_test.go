@@ -18,7 +18,9 @@
 package consumer
 
 import (
+	"encoding/binary"
 	"errors"
+	"net"
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -121,7 +123,7 @@ func TestConsumer(t *testing.T) {
 			rdConsumer.On("Close").Return(nil)
 
 			events <- &kafka.Message{
-				Key:   []byte{0x00, 0x00, 0x00, 0x00},
+				Key:   []byte{0x04, 0x03, 0x02, 0x01},
 				Value: []byte("payload"),
 			}
 
@@ -129,6 +131,11 @@ func TestConsumer(t *testing.T) {
 				messages, _ := consumer.Consume()
 				msg := <-messages
 				So(msg.Data, ShouldResemble, []byte("payload"))
+
+				ip := make(net.IP, 4)
+				binary.BigEndian.PutUint32(ip, msg.IP)
+				So(ip.String(), ShouldEqual, "1.2.3.4")
+
 				consumer.Close()
 				rdConsumer.AssertExpectations(t)
 			})
