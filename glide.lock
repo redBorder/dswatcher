@@ -1,5 +1,5 @@
 hash: 685094566a9b23abf2e1a8c984b3af04cfca35e70da63a7e01162998daac3a3c
-updated: 2017-03-03T15:06:05.385484992+01:00
+updated: 2017-03-08T11:15:50.634290162+01:00
 imports:
 - name: github.com/confluentinc/confluent-kafka-go
   version: a9b5c269c66e9a2eb5f195563b2f01e65a84c527
@@ -22,7 +22,7 @@ imports:
   - session
   - translate
 - name: golang.org/x/sys
-  version: e48874b42435b4347fc52bdee0424a52abc974d7
+  version: d67a3279aecd76a65c4c9e6c352c888f5b3a574a
   subpackages:
   - unix
 - name: gopkg.in/yaml.v2
