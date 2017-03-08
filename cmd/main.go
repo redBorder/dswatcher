@@ -112,8 +112,6 @@ func main() {
 			if err != nil {
 				logrus.Warn(err)
 			}
-
-			logrus.Debug("Updated sensors db")
 		}
 	}()
 
@@ -155,6 +153,7 @@ func main() {
 			binary.BigEndian.PutUint32(ip, message.IP)
 
 			if deviceID == 0 {
+				logrus.Debugf("Message without Device ID from: %s", ip.String())
 				continue
 			}
 
