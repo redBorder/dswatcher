@@ -29,7 +29,11 @@ tests:
 
 coverage:
 	@printf "$(MKL_BLUE)[COVERAGE]$(MKL_CLR_RESET) Computing coverage\n"
-	@go test ./internal/... -covermode=count -coverprofile=coverage.out
+	@go test -covermode=count -coverprofile=consumer.part ./internal/consumer
+	@go test -covermode=count -coverprofile=decoder.part ./internal/decoder
+	@go test -covermode=count -coverprofile=updater.part ./internal/updater
+	@echo "mode: count" > coverage.out
+	@grep -h -v "mode: count" *.part >> coverage.out
 	@go tool cover -func coverage.out
 
 GLIDE := $(shell command -v glide 2> /dev/null)
