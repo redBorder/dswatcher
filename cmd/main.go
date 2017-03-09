@@ -96,10 +96,11 @@ func main() {
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:  config.Updater.URL,
-		Key:  string(key),
-		Name: config.Updater.NodeName,
-		Path: config.Updater.Path,
+		URL:            config.Updater.URL,
+		AccessKey:      string(key),
+		Name:           config.Updater.NodeName,
+		DeviceIDPath:   config.Updater.DeviceIDPath,
+		SensorUUIDPath: config.Updater.SensorUUIDPath,
 	})
 	if err != nil {
 		logrus.Fatal(err)
@@ -196,8 +197,12 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		for range limitsMessages {
+		for uuid := range limitsMessages {
+			if err := chefUpdater.BlockSensor(updater.UUID(uuid)); err != nil {
+				logrus.Warnf("Blocking sensor %s, : %s", uuid, err.Error())
+			}
 		}
+
 		wg.Done()
 	}()
 

@@ -42,17 +42,17 @@ type ChefAPIClient interface {
 type ChefUpdaterConfig struct {
 	client *chef.Client
 
-	Name  string
-	URL   string
-	Key   string
-	IDKey string
-	Path  string
+	Name           string
+	URL            string
+	AccessKey      string
+	DeviceIDPath   string
+	SensorUUIDPath string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
 // address.
 type ChefUpdater struct {
-	nodes map[uint32]chef.Node
+	nodes map[uint32]*chef.Node
 
 	ChefUpdaterConfig
 }
@@ -60,13 +60,13 @@ type ChefUpdater struct {
 // NewChefUpdater creates a new instance of a ChefUpdater.
 func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 	updater := &ChefUpdater{
-		nodes:             make(map[uint32]chef.Node),
+		nodes:             make(map[uint32]*chef.Node),
 		ChefUpdaterConfig: config,
 	}
 
 	client, err := chef.NewClient(&chef.Config{
 		Name:    updater.Name,
-		Key:     updater.Key,
+		Key:     updater.AccessKey,
 		BaseURL: updater.URL,
 	})
 	if err != nil {
@@ -80,7 +80,7 @@ func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 
 // FetchNodes updates the internal node database and keep it in memory
 func (cu *ChefUpdater) FetchNodes() error {
-	keys := strings.Split(cu.Path, "/")
+	keys := strings.Split(cu.DeviceIDPath, "/")
 	deviceIDKey := keys[len(keys)-1]
 
 	nodeList, err := cu.client.Nodes.List()
@@ -94,7 +94,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getAttributes(node.NormalAttributes, cu.Path)
+		attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
@@ -110,7 +110,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 			continue
 		}
 
-		cu.nodes[uint32(deviceID)] = node
+		cu.nodes[uint32(deviceID)] = &node
 	}
 
 	return nil
@@ -122,7 +122,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error {
 	node := cu.nodes[deviceID]
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.Path)
+	attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
 	if err != nil {
 		return errors.New("Updating node: " + err.Error())
 	}
@@ -130,9 +130,33 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 	attributes["ipaddress"] = address.String()
 	attributes["observation_id"] = strconv.FormatUint(uint64(obsID), 10)
 
-	cu.client.Nodes.Put(node)
+	cu.client.Nodes.Put(*node)
 	if err != nil {
 		return errors.New("Updating node: " + err.Error())
+	}
+
+	return nil
+}
+
+// BlockSensor gets a list of nodes an look for one with the given address. If a
+// node is found will update the deviceID.
+// If a node with the given address is not found an error is returned
+func (cu *ChefUpdater) BlockSensor(uuid UUID) error {
+	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
+	if err != nil {
+		return errors.New("Blocking node: " + err.Error())
+	}
+
+	attributes, err := getAttributes(node.NormalAttributes, cu.SensorUUIDPath)
+	if err != nil {
+		return errors.New("Blocking node: " + err.Error())
+	}
+
+	attributes["blocked"] = true
+
+	cu.client.Nodes.Put(*node)
+	if err != nil {
+		return errors.New("Blocking node: " + err.Error())
 	}
 
 	return nil
@@ -167,4 +191,27 @@ func printNode(node chef.Node) error {
 	os.Stdout.WriteString("\n")
 
 	return nil
+}
+
+func findNode(keyPath string, value string, nodes map[uint32]*chef.Node,
+) (node *chef.Node, err error) {
+	key := getKeyFromPath(keyPath)
+
+	for _, node := range nodes {
+		attributes, err := getAttributes(node.NormalAttributes, keyPath)
+		if err != nil {
+			continue
+		}
+
+		if attributes[key] == value {
+			return node, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func getKeyFromPath(path string) string {
+	keys := strings.Split(path, "/")
+	return keys[len(keys)-1]
 }
