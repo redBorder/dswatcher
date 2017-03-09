@@ -59,6 +59,8 @@ func init() {
 }
 
 func main() {
+	wg := new(sync.WaitGroup)
+
 	////////////////////
 	// Configuration //
 	////////////////////
@@ -105,7 +107,8 @@ func main() {
 
 	err = chefUpdater.FetchNodes()
 
-	ticker := time.NewTicker(time.Duration(config.Updater.FetchInterval) * time.Second)
+	ticker := time.NewTicker(
+		time.Duration(config.Updater.FetchInterval) * time.Second)
 	go func() {
 		for range ticker.C {
 			err = chefUpdater.FetchNodes()
@@ -115,9 +118,9 @@ func main() {
 		}
 	}()
 
-	////////////////////
-	// Kafka consumer //
-	////////////////////
+	////////////////////////////
+	// Kafka Netflow consumer //
+	////////////////////////////
 
 	consumerConfig, err := BootstrapRdKafka(
 		config.Broker.Address,
@@ -135,12 +138,17 @@ func main() {
 	messages, events := kafkaConsumer.Consume()
 	defer kafkaConsumer.Close()
 
+	///////////////////////////
+	// Kafka Limits consumer //
+	///////////////////////////
+
+	// TODO
+
 	//////////////////////////////////////////////////////////////////////////////
-	// Main loop
+	// Discarded Netflow Processing
 	//////////////////////////////////////////////////////////////////////////////
 
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
 		for message := range messages {
 			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
@@ -169,12 +177,15 @@ func main() {
 			}
 
 			lastUpdated[deviceID] = time.Now()
-			logrus.Infof("Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]", ip.String(), deviceID, obsID)
+			logrus.Infof(
+				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
+				ip.String(), deviceID, obsID)
 		}
 
 		wg.Done()
 	}()
 
+	wg.Add(1)
 	go func() {
 		for event := range events {
 			logrus.Debugln(event)
@@ -182,7 +193,16 @@ func main() {
 		wg.Done()
 	}()
 
-	wg.Wait()
+	//////////////////////////////////////////////////////////////////////////////
+	// Sensors limits messages
+	//////////////////////////////////////////////////////////////////////////////
 
+	// TODO
+
+	//////////////////////////////////////////////////////////////////////////////
+	// The End
+	//////////////////////////////////////////////////////////////////////////////
+
+	wg.Wait()
 	logrus.Infoln("Bye bye...")
 }
