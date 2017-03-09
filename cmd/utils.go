@@ -27,7 +27,10 @@ import (
 
 // PrintVersion displays the application version.
 func PrintVersion() {
-	fmt.Println(version)
+	_, s := rdkafka.LibraryVersion()
+	fmt.Printf("Dynamic Sensors Watcher\t:: %s\n", version)
+	fmt.Printf("Go\t\t\t:: %s\n", runtime.Version())
+	fmt.Printf("librdkafka\t\t:: %s\n", s)
 }
 
 // BootstrapRdKafka creates a Kafka consumer configuration struct.
