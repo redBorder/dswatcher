@@ -59,6 +59,8 @@ func init() {
 }
 
 func main() {
+	wg := new(sync.WaitGroup)
+
 	////////////////////
 	// Configuration //
 	////////////////////
@@ -105,7 +107,8 @@ func main() {
 
 	err = chefUpdater.FetchNodes()
 
-	ticker := time.NewTicker(time.Duration(config.Updater.FetchInterval) * time.Second)
+	ticker := time.NewTicker(
+		time.Duration(config.Updater.FetchInterval) * time.Second)
 	go func() {
 		for range ticker.C {
 			err = chefUpdater.FetchNodes()
@@ -115,34 +118,36 @@ func main() {
 		}
 	}()
 
-	////////////////////
-	// Kafka consumer //
-	////////////////////
+	////////////////////////////
+	// Kafka Netflow consumer //
+	////////////////////////////
 
 	consumerConfig, err := BootstrapRdKafka(
 		config.Broker.Address,
 		config.Broker.ConsumerGroup,
-		config.Broker.Topics)
+		config.Broker.NetflowTopics,
+		config.Broker.LimitsTopics,
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	kafkaConsumer, err := consumer.NewKafkaNetflowConsumer(consumerConfig)
+	kafkaConsumer, err := consumer.NewKafkaConsumer(consumerConfig)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	messages, events := kafkaConsumer.Consume()
+	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
+	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 	defer kafkaConsumer.Close()
 
 	//////////////////////////////////////////////////////////////////////////////
-	// Main loop
+	// Discarded Netflow Processing
 	//////////////////////////////////////////////////////////////////////////////
 
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
-		for message := range messages {
+		for message := range nfMessages {
 			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln(err)
@@ -169,20 +174,45 @@ func main() {
 			}
 
 			lastUpdated[deviceID] = time.Now()
-			logrus.Infof("Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]", ip.String(), deviceID, obsID)
+			logrus.Infof(
+				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
+				ip.String(), deviceID, obsID)
 		}
 
 		wg.Done()
 	}()
 
+	wg.Add(1)
 	go func() {
-		for event := range events {
+		for event := range nfEvents {
 			logrus.Debugln(event)
 		}
 		wg.Done()
 	}()
 
-	wg.Wait()
+	//////////////////////////////////////////////////////////////////////////////
+	// Sensors limits messages
+	//////////////////////////////////////////////////////////////////////////////
 
+	wg.Add(1)
+	go func() {
+		for range limitsMessages {
+		}
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		for event := range limitsEvents {
+			logrus.Debugln(event)
+		}
+		wg.Done()
+	}()
+
+	//////////////////////////////////////////////////////////////////////////////
+	// The End
+	//////////////////////////////////////////////////////////////////////////////
+
+	wg.Wait()
 	logrus.Infoln("Bye bye...")
 }

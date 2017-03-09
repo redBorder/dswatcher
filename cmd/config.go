@@ -28,7 +28,8 @@ type DynamicSensorsWatcherConfig struct {
 	Broker struct {
 		Address       string   `yaml:"address"`
 		ConsumerGroup string   `yaml:"consumer_group"`
-		Topics        []string `yaml:"topics"`
+		NetflowTopics []string `yaml:"netflow_topics"`
+		LimitsTopics  []string `yaml:"limits_topics"`
 	}
 	Decoder struct {
 		ElementID int `yaml:"element_id"`
