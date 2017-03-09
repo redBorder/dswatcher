@@ -19,6 +19,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
@@ -32,7 +33,8 @@ func PrintVersion() {
 // BootstrapRdKafka creates a Kafka consumer configuration struct.
 func BootstrapRdKafka(
 	broker, consumerGroup string,
-	topics []string,
+	nfTopics []string,
+	limitsTopics []string,
 	additionalAttributes ...string,
 ) (config consumer.KakfaConsumerConfig, err error) {
 	attributes := &rdkafka.ConfigMap{
@@ -45,14 +47,21 @@ func BootstrapRdKafka(
 		attributes.Set(attr)
 	}
 
-	rdconsumer, err := rdkafka.NewConsumer(attributes)
+	nfConsumer, err := rdkafka.NewConsumer(attributes)
+	if err != nil {
+		return
+	}
+	limitsConsumer, err := rdkafka.NewConsumer(attributes)
 	if err != nil {
 		return
 	}
 
 	config = consumer.KakfaConsumerConfig{
-		Topics:     topics,
-		RdConsumer: rdconsumer,
+		NetflowConsumer: nfConsumer,
+		NetflowTopics:   nfTopics,
+
+		LimitsConsumer: limitsConsumer,
+		LimitsTopics:   limitsTopics,
 	}
 
 	return

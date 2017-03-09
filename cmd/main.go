@@ -125,24 +125,21 @@ func main() {
 	consumerConfig, err := BootstrapRdKafka(
 		config.Broker.Address,
 		config.Broker.ConsumerGroup,
-		config.Broker.Topics)
+		config.Broker.NetflowTopics,
+		config.Broker.LimitsTopics,
+	)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	kafkaConsumer, err := consumer.NewKafkaNetflowConsumer(consumerConfig)
+	kafkaConsumer, err := consumer.NewKafkaConsumer(consumerConfig)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	messages, events := kafkaConsumer.Consume()
+	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
+	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 	defer kafkaConsumer.Close()
-
-	///////////////////////////
-	// Kafka Limits consumer //
-	///////////////////////////
-
-	// TODO
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Discarded Netflow Processing
@@ -150,7 +147,7 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		for message := range messages {
+		for message := range nfMessages {
 			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln(err)
@@ -187,7 +184,7 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		for event := range events {
+		for event := range nfEvents {
 			logrus.Debugln(event)
 		}
 		wg.Done()
@@ -197,7 +194,20 @@ func main() {
 	// Sensors limits messages
 	//////////////////////////////////////////////////////////////////////////////
 
-	// TODO
+	wg.Add(1)
+	go func() {
+		for range limitsMessages {
+		}
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
+		for event := range limitsEvents {
+			logrus.Debugln(event)
+		}
+		wg.Done()
+	}()
 
 	//////////////////////////////////////////////////////////////////////////////
 	// The End
