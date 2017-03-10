@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/go-chef/chef"
 )
 
@@ -50,7 +49,7 @@ type ChefUpdaterConfig struct {
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
 // address.
 type ChefUpdater struct {
-	nodes map[uint32]*chef.Node
+	nodes map[string]*chef.Node
 
 	ChefUpdaterConfig
 }
@@ -58,7 +57,7 @@ type ChefUpdater struct {
 // NewChefUpdater creates a new instance of a ChefUpdater.
 func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 	updater := &ChefUpdater{
-		nodes:             make(map[uint32]*chef.Node),
+		nodes:             make(map[string]*chef.Node),
 		ChefUpdaterConfig: config,
 	}
 
@@ -78,16 +77,13 @@ func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 
 // FetchNodes updates the internal node database and keep it in memory
 func (cu *ChefUpdater) FetchNodes() error {
-	keys := strings.Split(cu.DeviceIDPath, "/")
-	deviceIDKey := keys[len(keys)-1]
-
 	nodeList, err := cu.client.Nodes.List()
 	if err != nil {
 		return errors.New("Couldn't list nodes: " + err.Error())
 	}
 
-	for node := range nodeList {
-		node, err := cu.client.Nodes.Get(node)
+	for n := range nodeList {
+		node, err := cu.client.Nodes.Get(n)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
@@ -97,18 +93,12 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		deviceIDStr, ok := attributes[deviceIDKey].(string)
+		sensorUUID, ok := attributes["sensor_uuid"].(string)
 		if !ok {
 			continue
 		}
 
-		deviceID, err := strconv.ParseUint(deviceIDStr, 10, 32)
-		if err != nil {
-			logrus.Warn(err)
-			continue
-		}
-
-		cu.nodes[uint32(deviceID)] = &node
+		cu.nodes[sensorUUID] = &node
 	}
 
 	return nil
@@ -118,7 +108,15 @@ func (cu *ChefUpdater) FetchNodes() error {
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error {
-	node := cu.nodes[deviceID]
+	deviceIDStr := strconv.FormatUint(uint64(deviceID), 10)
+	node, err := findNode(cu.DeviceIDPath, deviceIDStr, cu.nodes)
+	if err != nil {
+		return err
+	}
+
+	if node == nil {
+		return errors.New("Node not found")
+	}
 
 	if node == nil {
 		return errors.New("Node not found")
@@ -187,7 +185,7 @@ func getAttributes(
 	return attrs, nil
 }
 
-func findNode(keyPath string, value string, nodes map[uint32]*chef.Node,
+func findNode(keyPath string, value string, nodes map[string]*chef.Node,
 ) (node *chef.Node, err error) {
 	key := getKeyFromPath(keyPath)
 

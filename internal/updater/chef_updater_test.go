@@ -39,28 +39,28 @@ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
 37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
 -----END RSA PRIVATE KEY-----`
 
-func bootstrapSensorsDB() map[uint32]*chef.Node {
-	nodes := make(map[uint32]*chef.Node)
-	nodes[0] = &chef.Node{
+func bootstrapSensorsDB() map[string]*chef.Node {
+	nodes := make(map[string]*chef.Node)
+	nodes["0"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
 				"uuid": "0000",
 			},
 		},
 	}
-	nodes[1] = &chef.Node{
+	nodes["1"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org2": map[string]interface{}{
 				"uuid": "1111",
 			},
 		},
 	}
-	nodes[3] = &chef.Node{
+	nodes["3"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{},
 		},
 	}
-	nodes[3] = &chef.Node{
+	nodes["3"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"uuid": "9999",
 		},
@@ -80,15 +80,15 @@ func TestFindNode(t *testing.T) {
 
 	node, err := findNode("org/uuid", "0000", nodes)
 	assert.NoError(t, err)
-	assert.Equal(t, nodes[0], node)
+	assert.Equal(t, nodes["0"], node)
 
 	node, err = findNode("org2/uuid", "1111", nodes)
 	assert.NoError(t, err)
-	assert.Equal(t, nodes[1], node)
+	assert.Equal(t, nodes["1"], node)
 
 	node, err = findNode("uuid", "9999", nodes)
 	assert.NoError(t, err)
-	assert.Equal(t, nodes[3], node)
+	assert.Equal(t, nodes["3"], node)
 
 	node, err = findNode("org/uuid", "1234", nodes)
 	assert.NoError(t, err)
@@ -109,10 +109,13 @@ func TestBlockSensors(t *testing.T) {
 	assert.NoError(t, err)
 
 	chefUpdater.nodes = bootstrapSensorsDB()
-	chefUpdater.BlockSensor("0000")
 
-	attributes, err := getAttributes(chefUpdater.nodes[0].NormalAttributes, "org/blocked")
+	err = chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
-
+	attributes, err := getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
+
+	err = chefUpdater.BlockSensor("7777")
+	assert.Error(t, err)
 }
