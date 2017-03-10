@@ -110,12 +110,22 @@ func TestBlockSensors(t *testing.T) {
 
 	chefUpdater.nodes = bootstrapSensorsDB()
 
-	err = chefUpdater.BlockSensor("0000")
+	blocked, err := chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
 	attributes, err := getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
 	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
+	assert.True(t, blocked)
 
-	err = chefUpdater.BlockSensor("7777")
+	blocked, err = chefUpdater.BlockSensor("0000")
+	assert.NoError(t, err)
+	attributes, err = getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	assert.NoError(t, err)
+	assert.True(t, attributes["blocked"].(bool))
+	assert.False(t, blocked)
+
+	blocked, err = chefUpdater.BlockSensor("7777")
 	assert.Error(t, err)
+	assert.False(t, blocked)
+
 }

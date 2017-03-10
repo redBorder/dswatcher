@@ -200,12 +200,16 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for uuid := range limitsMessages {
-			if err := chefUpdater.BlockSensor(updater.UUID(uuid)); err != nil {
+			blocked, err := chefUpdater.BlockSensor(updater.UUID(uuid))
+
+			if err != nil {
 				logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
 				continue
 			}
 
-			logrus.Info("Blocked UUID: " + uuid)
+			if blocked {
+				logrus.Info("Blocked UUID: " + uuid)
+			}
 		}
 
 		wg.Done()

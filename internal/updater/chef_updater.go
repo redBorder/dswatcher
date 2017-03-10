@@ -141,29 +141,35 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 // BlockSensor gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) BlockSensor(uuid UUID) error {
+func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if node == nil {
-		return errors.New("Node not found")
+		return false, errors.New("Node not found")
 	}
 
 	attributes, err := getAttributes(node.NormalAttributes, cu.SensorUUIDPath)
 	if err != nil {
-		return err
+		return false, err
+	}
+
+	if blocked, ok := attributes["blocked"].(bool); ok {
+		if blocked {
+			return false, nil
+		}
 	}
 
 	attributes["blocked"] = true
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
 // getAttributes receives the root object containing all the attributes of the
