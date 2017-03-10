@@ -122,9 +122,13 @@ func (cu *ChefUpdater) FetchNodes() error {
 func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error {
 	node := cu.nodes[deviceID]
 
+	if node == nil {
+		return errors.New("Node not found")
+	}
+
 	attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
 	if err != nil {
-		return errors.New("Updating node: " + err.Error())
+		return err
 	}
 
 	attributes["ipaddress"] = address.String()
@@ -132,7 +136,7 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
-		return errors.New("Updating node: " + err.Error())
+		return err
 	}
 
 	return nil
@@ -144,19 +148,23 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 func (cu *ChefUpdater) BlockSensor(uuid UUID) error {
 	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
 	if err != nil {
-		return errors.New("Blocking node: " + err.Error())
+		return err
+	}
+
+	if node == nil {
+		return errors.New("Node not found")
 	}
 
 	attributes, err := getAttributes(node.NormalAttributes, cu.SensorUUIDPath)
 	if err != nil {
-		return errors.New("Blocking node: " + err.Error())
+		return err
 	}
 
 	attributes["blocked"] = true
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
-		return errors.New("Blocking node: " + err.Error())
+		return err
 	}
 
 	return nil
