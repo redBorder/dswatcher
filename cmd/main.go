@@ -120,9 +120,9 @@ func main() {
 		}
 	}()
 
-	////////////////////////////
-	// Kafka Netflow consumer //
-	////////////////////////////
+	////////////////////
+	// Kafka consumer //
+	////////////////////
 
 	consumerConfig, err := BootstrapRdKafka(
 		config.Broker.Address,
@@ -138,14 +138,13 @@ func main() {
 	if err != nil {
 		logrus.Fatal("Error creating Kafka consumer: " + err.Error())
 	}
-
-	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
-	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 	defer kafkaConsumer.Close()
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Discarded Netflow Processing
 	//////////////////////////////////////////////////////////////////////////////
+
+	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
 
 	wg.Add(1)
 	go func() {
@@ -195,6 +194,8 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////
 	// Sensors limits messages
 	//////////////////////////////////////////////////////////////////////////////
+
+	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 
 	wg.Add(1)
 	go func() {

@@ -18,10 +18,8 @@
 package updater
 
 import (
-	"encoding/json"
 	"errors"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -187,18 +185,6 @@ func getAttributes(
 	}
 
 	return attrs, nil
-}
-
-func printNode(node chef.Node) error {
-	jsonData, err := json.MarshalIndent(node, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	os.Stdout.Write(jsonData)
-	os.Stdout.WriteString("\n")
-
-	return nil
 }
 
 func findNode(keyPath string, value string, nodes map[uint32]*chef.Node,
