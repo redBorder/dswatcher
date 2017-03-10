@@ -40,21 +40,29 @@ func BootstrapRdKafka(
 	limitsTopics []string,
 	additionalAttributes ...string,
 ) (config consumer.KakfaConsumerConfig, err error) {
-	attributes := &rdkafka.ConfigMap{
+
+	nfAttributes := &rdkafka.ConfigMap{
+		"bootstrap.servers":               broker,
+		"group.id":                        consumerGroup,
+		"go.events.channel.enable":        true,
+		"go.application.rebalance.enable": true,
+	}
+	limitsAttributes := &rdkafka.ConfigMap{
 		"bootstrap.servers":               broker,
 		"group.id":                        consumerGroup,
 		"go.events.channel.enable":        true,
 		"go.application.rebalance.enable": true,
 	}
 	for _, attr := range additionalAttributes {
-		attributes.Set(attr)
+		nfAttributes.Set(attr)
+		limitsAttributes.Set(attr)
 	}
 
-	nfConsumer, err := rdkafka.NewConsumer(attributes)
+	nfConsumer, err := rdkafka.NewConsumer(nfAttributes)
 	if err != nil {
 		return
 	}
-	limitsConsumer, err := rdkafka.NewConsumer(attributes)
+	limitsConsumer, err := rdkafka.NewConsumer(limitsAttributes)
 	if err != nil {
 		return
 	}

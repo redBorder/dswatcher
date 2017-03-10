@@ -67,12 +67,12 @@ func main() {
 
 	rawConfig, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error opening configuration file: " + err.Error())
 	}
 
 	config, err := ParseConfig(rawConfig)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error parsing config" + err.Error())
 	}
 
 	//////////////////////
@@ -92,35 +92,37 @@ func main() {
 
 	key, err := ioutil.ReadFile(config.Updater.Key)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error reading client Key: " + err.Error())
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:  config.Updater.URL,
-		Key:  string(key),
-		Name: config.Updater.NodeName,
-		Path: config.Updater.Path,
+		URL:            config.Updater.URL,
+		AccessKey:      string(key),
+		Name:           config.Updater.NodeName,
+		DeviceIDPath:   config.Updater.DeviceIDPath,
+		SensorUUIDPath: config.Updater.SensorUUIDPath,
 	})
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error creating Chef API client: " + err.Error())
 	}
 
 	err = chefUpdater.FetchNodes()
 
 	ticker := time.NewTicker(
 		time.Duration(config.Updater.FetchInterval) * time.Second)
+
 	go func() {
 		for range ticker.C {
 			err = chefUpdater.FetchNodes()
 			if err != nil {
-				logrus.Warn(err)
+				logrus.Warn("Error fetching nodes: " + err.Error())
 			}
 		}
 	}()
 
-	////////////////////////////
-	// Kafka Netflow consumer //
-	////////////////////////////
+	////////////////////
+	// Kafka consumer //
+	////////////////////
 
 	consumerConfig, err := BootstrapRdKafka(
 		config.Broker.Address,
@@ -129,28 +131,27 @@ func main() {
 		config.Broker.LimitsTopics,
 	)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error creating Kafka config: " + err.Error())
 	}
 
 	kafkaConsumer, err := consumer.NewKafkaConsumer(consumerConfig)
 	if err != nil {
-		logrus.Fatal(err)
+		logrus.Fatal("Error creating Kafka consumer: " + err.Error())
 	}
-
-	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
-	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 	defer kafkaConsumer.Close()
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Discarded Netflow Processing
 	//////////////////////////////////////////////////////////////////////////////
 
+	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
+
 	wg.Add(1)
 	go func() {
 		for message := range nfMessages {
 			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
-				logrus.Errorln(err)
+				logrus.Errorln("Error decoding netflow: " + err.Error())
 				continue
 			}
 
@@ -164,7 +165,7 @@ func main() {
 
 			err = chefUpdater.UpdateNode(ip, deviceID, obsID)
 			if err != nil {
-				logrus.Warn("Error: " + err.Error())
+				logrus.Warn("Error updating node: " + err.Error())
 				continue
 			}
 
@@ -194,10 +195,23 @@ func main() {
 	// Sensors limits messages
 	//////////////////////////////////////////////////////////////////////////////
 
+	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
+
 	wg.Add(1)
 	go func() {
-		for range limitsMessages {
+		for uuid := range limitsMessages {
+			blocked, err := chefUpdater.BlockSensor(updater.UUID(uuid))
+
+			if err != nil {
+				logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
+				continue
+			}
+
+			if blocked {
+				logrus.Info("Blocked UUID: " + uuid)
+			}
 		}
+
 		wg.Done()
 	}()
 
@@ -206,6 +220,7 @@ func main() {
 		for event := range limitsEvents {
 			logrus.Debugln(event)
 		}
+
 		wg.Done()
 	}()
 
