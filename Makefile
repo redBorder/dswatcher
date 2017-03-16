@@ -4,7 +4,7 @@ MKL_YELLOW?=	\033[033m
 MKL_BLUE?=	\033[034m
 MKL_CLR_RESET?=	\033[0m
 
-BIN=      dynamic-sensor-watcher
+BIN=      dswatcher
 prefix?=  /usr/local
 bindir?=	$(prefix)/bin
 
@@ -42,7 +42,7 @@ ifndef GLIDE
 	$(error glide is not installed)
 endif
 	@printf "$(MKL_BLUE)[DEPS]$(MKL_CLR_RESET)  Resolving dependencies\n"
-	@glide update
+	@glide install
 
 clean:
 	rm -f $(BIN)

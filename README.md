@@ -1,14 +1,30 @@
-[![Build Status](https://travis-ci.org/redBorder/dynamic-sensors-watcher.svg?branch=master)](https://travis-ci.org/redBorder/dynamic-sensors-watcher)
-[![Coverage Status](https://coveralls.io/repos/github/redBorder/dynamic-sensors-watcher/badge.svg?branch=master)](https://coveralls.io/github/redBorder/dynamic-sensors-watcher?branch=master)
-[![Go Report Card](https://goreportcard.com/badge/github.com/redBorder/dynamic-sensors-watcher)](https://goreportcard.com/report/github.com/redBorder/dynamic-sensors-watcher)
+[![Build Status](https://travis-ci.org/redBorder/dswatcher.svg?branch=master)](https://travis-ci.org/redBorder/dswatcher)
+[![Coverage Status](https://coveralls.io/repos/github/redBorder/dswatcher/badge.svg?branch=master)](https://coveralls.io/github/redBorder/dswatcher?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/redBorder/dswatcher)](https://goreportcard.com/report/github.com/redBorder/dswatcher)
 
-# dynamic-sensors-watcher
+# dswatcher (Dynamic Sensors Watcher)
+
+* [Overview](#overview)
+* [Installing](#installing)
+* [Usage](#usage)
+* [Configuration](#configuration)
+* [Roadmap](#roadmap)
 
 ## Overview
 
-Service for allowing new sensors to send flow based on a serial number.
+Service for dynamically add and remove Teldat sensors on the Netflow collector
+by updating the information on the Chef node.
 
-The serial number is sent on an Netflow **option template**.
+- When a new sensor starts to send data to the Netflow collector, the data will
+be discarded to a Kafka topic.
+- `dswatcher` will analyze the discarded Netflow data looking for
+a specific *Option Template* that carries a *Serial Number*.
+- `dswatcher` will look up on the Chef sensor nodes for a
+node with the *Serial number*. If this sensor exists, the IP address for the
+sensor and the Observation ID will be updated with the IP address and Observation
+ID of the Netflow sender.
+- `dswatcher` will listen for alerts about sensors that reached
+their limits. The sensor will be marked as blocked on the Chef node.
 
 ## Installing
 
@@ -22,17 +38,17 @@ curl https://glide.sh/get | sh
 
 And then:
 
-1. Clone this repo and cd to the project
+1. Clone this repo and cd to the project:
 
     ```bash
-    git clone https://github.com/redBorder/dynamic-sensors-watcher.git && cd dynamic-sensors-watcher
+    git clone https://github.com/redBorder/dswatcher.git && cd dswatcher
     ```
-2. Install dependencies and compile
+2. Install dependencies and compile:
 
     ```bash
     make
     ```
-3. Install on desired directory
+3. Install on desired directory:
 
     ```bash
     prefix=/opt/dynamic-sensors-watcher/ make install
@@ -40,7 +56,7 @@ And then:
 
 ## Usage
 
-Usage of dynamic-sensors-watcher:
+Usage of dswatcher:
 
 ```
 --version
@@ -51,6 +67,31 @@ Usage of dynamic-sensors-watcher:
     Print debug info
 ```
 
+## Configuration
+
+```yaml
+broker:
+  address: kafka:9092  # Kafka host
+  consumer_group: dnw  # Kafka consumer group ID
+  netflow_topics:
+    - rb_flow_discard  # Topic to look up for the Option Template where the serial number is
+  limits_topics:
+    - rb_limits        # Topic listen for notification about sensors limits
+
+decoder:
+  element_id: 300          # Netflow element id of the serial number
+  option_template_id: 258  # ID of the Option Template where the serial number is
+
+updater:
+  chef_server_url: <chef_server_url>            # URL of the Chef server
+  node_name: <node_name>                        # Node name on Chef
+  client_key: key.pem                           # Path to the key used for Chef authorization
+  serial_number_path: redBorder/serial_number   # Path to the serial number of the sensor on Chef
+  sensor_uuid_path: redBorder/sensor_uuid       # Path to the UUID of the sensor on Chef
+  fetch_interval_s: 60                          # Time between updates of the internal sensors database
+  update_interval_s: 30                         # Time between updates of the Chef node
+```
+
 ## Roadmap
 
 | Version  | Feature             | Status    |
@@ -58,4 +99,4 @@ Usage of dynamic-sensors-watcher:
 | 0.1      | Kafka consumer      | Done      |
 | 0.2      | Netflow decoder     | Done      |
 | 0.3      | Chef updater        | Done      |
-| 0.5      | Instrumentation     | _Pending_ |
+| 0.4      | Blocking sensors    | Done      |

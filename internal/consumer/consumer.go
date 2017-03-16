@@ -17,6 +17,9 @@
 
 package consumer
 
+// UUID identifies the sensor that reached the limit
+type UUID string
+
 // FlowData contains the IP address of the Netflow exporter and the flow itself
 type FlowData struct {
 	IP   uint32
@@ -25,5 +28,6 @@ type FlowData struct {
 
 // NetflowConsumer gets an IP address and Netflow data from a resource
 type NetflowConsumer interface {
-	Consume() (messages chan FlowData, events chan string)
+	ConsumeNetflow() (messages chan FlowData, events chan string)
+	ConsumeLimits() (messages chan UUID, events chan string)
 }

@@ -19,40 +19,60 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
+	"github.com/redBorder/dswatcher/internal/consumer"
 )
 
 // PrintVersion displays the application version.
 func PrintVersion() {
-	fmt.Println(version)
+	_, s := rdkafka.LibraryVersion()
+	fmt.Printf("Dynamic Sensors Watcher\t:: %s\n", version)
+	fmt.Printf("Go\t\t\t:: %s\n", runtime.Version())
+	fmt.Printf("librdkafka\t\t:: %s\n", s)
 }
 
 // BootstrapRdKafka creates a Kafka consumer configuration struct.
 func BootstrapRdKafka(
 	broker, consumerGroup string,
-	topics []string,
+	nfTopics []string,
+	limitsTopics []string,
 	additionalAttributes ...string,
 ) (config consumer.KakfaConsumerConfig, err error) {
-	attributes := &rdkafka.ConfigMap{
+
+	nfAttributes := &rdkafka.ConfigMap{
+		"bootstrap.servers":               broker,
+		"group.id":                        consumerGroup,
+		"go.events.channel.enable":        true,
+		"go.application.rebalance.enable": true,
+	}
+	limitsAttributes := &rdkafka.ConfigMap{
 		"bootstrap.servers":               broker,
 		"group.id":                        consumerGroup,
 		"go.events.channel.enable":        true,
 		"go.application.rebalance.enable": true,
 	}
 	for _, attr := range additionalAttributes {
-		attributes.Set(attr)
+		nfAttributes.Set(attr)
+		limitsAttributes.Set(attr)
 	}
 
-	rdconsumer, err := rdkafka.NewConsumer(attributes)
+	nfConsumer, err := rdkafka.NewConsumer(nfAttributes)
+	if err != nil {
+		return
+	}
+	limitsConsumer, err := rdkafka.NewConsumer(limitsAttributes)
 	if err != nil {
 		return
 	}
 
 	config = consumer.KakfaConsumerConfig{
-		Topics:     topics,
-		RdConsumer: rdconsumer,
+		NetflowConsumer: nfConsumer,
+		NetflowTopics:   nfTopics,
+
+		LimitsConsumer: limitsConsumer,
+		LimitsTopics:   limitsTopics,
 	}
 
 	return

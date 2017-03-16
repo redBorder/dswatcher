@@ -17,8 +17,14 @@
 
 package updater
 
+import "net"
+
+// UUID identifies the sensor that reached the limit
+type UUID string
+
 // Updater is an interface for an updater that adds an IP address to a sensors
 // information object.
 type Updater interface {
-	Update(ip uint32, deviceID, obsID uint32) error
+	UpdateNode(net.IP, uint32, uint32) error
+	BlockNode(UUID) error
 }

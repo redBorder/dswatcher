@@ -19,6 +19,7 @@ package consumer
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -44,81 +45,91 @@ type RdKafkaConsumer interface {
 
 // KakfaConsumerConfig contains the configuration for a Kafka Consumer.
 type KakfaConsumerConfig struct {
-	RdConsumer RdKafkaConsumer
-	Topics     []string
+	NetflowConsumer RdKafkaConsumer
+	LimitsConsumer  RdKafkaConsumer
+	NetflowTopics   []string
+	LimitsTopics    []string
 }
 
 ///////////////////
 // KafkaConsumer //
 ///////////////////
 
-// KafkaFlowConsumer implements "Consumer" and consumes messages from a Kafka broker
-type KafkaFlowConsumer struct {
+// KafkaConsumer implements "Consumer" and consumes messages from a Kafka broker
+type KafkaConsumer struct {
 	terminate chan struct{}
 
 	KakfaConsumerConfig
 }
 
-// NewKafkaNetflowConsumer creates a new instance of a Kafka consumer and subscribes
+// NewKafkaConsumer creates a new instance of a Kafka consumer and subscribes
 // to the provided topics
-func NewKafkaNetflowConsumer(config KakfaConsumerConfig) (kc *KafkaFlowConsumer, err error) {
-	kc = &KafkaFlowConsumer{
+func NewKafkaConsumer(config KakfaConsumerConfig) (kc *KafkaConsumer, err error) {
+	kc = &KafkaConsumer{
 		terminate:           make(chan struct{}),
 		KakfaConsumerConfig: config,
 	}
 
-	err = kc.RdConsumer.SubscribeTopics(config.Topics, nil)
-	if err != nil {
-		return nil, errors.New("Error on subscription to topics: " + err.Error())
+	if kc.NetflowConsumer != nil {
+		err = kc.NetflowConsumer.SubscribeTopics(config.NetflowTopics, nil)
+		if err != nil {
+			return nil, errors.New("Error on subscription to topics: " + err.Error())
+		}
+	}
+
+	if kc.LimitsConsumer != nil {
+		err = kc.LimitsConsumer.SubscribeTopics(config.LimitsTopics, nil)
+		if err != nil {
+			return nil, errors.New("Error on subscription to topics: " + err.Error())
+		}
 	}
 
 	return
 }
 
-// Consume receives events from the kafka broker. "messages" channel receives
-// actual messages and "info" channel receives notifications
-func (kc *KafkaFlowConsumer) Consume() (chan FlowData, chan string) {
+// ConsumeNetflow receives netflow from the kafka broker. "messages" channel
+// receives actual messages and "info" channel receives notifications from the
+// Kafka broker.
+func (kc *KafkaConsumer) ConsumeNetflow() (chan FlowData, chan string) {
 	messages := make(chan FlowData)
-	info := make(chan string)
+	inputMessages, info := receiveLoop(kc.NetflowConsumer, kc.terminate)
 
 	go func() {
-	receiving:
-		for {
-			select {
-			case <-kc.terminate:
-				break receiving
-
-			case ev := <-kc.RdConsumer.Events():
-				switch e := ev.(type) {
-				case kafka.AssignedPartitions:
-					kc.RdConsumer.Assign(e.Partitions)
-					info <- e.String()
-
-				case kafka.RevokedPartitions:
-					kc.RdConsumer.Unassign()
-					info <- e.String()
-
-				case kafka.Error:
-					info <- "Error: " + e.String()
-
-				case *kafka.Message:
-					if len(e.Key) != 4 {
-						info <- "Ignored message: Invalid message key"
-						continue
-					}
-					messages <- FlowData{
-						IP:   binary.LittleEndian.Uint32(e.Key),
-						Data: e.Value,
-					}
-
-				default:
-					info <- e.String()
-				}
+		for m := range inputMessages {
+			if len(m.Key) != 4 {
+				info <- "Ignored message: Invalid message key"
+				continue
+			}
+			messages <- FlowData{
+				IP:   binary.LittleEndian.Uint32(m.Key),
+				Data: m.Value,
 			}
 		}
 
-		kc.RdConsumer.Close()
-		close(info)
+		kc.NetflowConsumer.Close()
+		close(messages)
+		close(kc.terminate)
+	}()
+
+	return messages, info
+}
+
+// ConsumeLimits receives limits messages from the kafka broker.
+// "messages" channel receives actual messages and "info" channel receives
+// notifications from the Kafka broker.
+func (kc *KafkaConsumer) ConsumeLimits() (chan UUID, chan string) {
+	messages := make(chan UUID)
+	inputMessages, info := receiveLoop(kc.LimitsConsumer, kc.terminate)
+
+	go func() {
+		for m := range inputMessages {
+			var data struct{ UUID string }
+			json.Unmarshal(m.Value, &data)
+
+			messages <- UUID(data.UUID)
+		}
+
+		kc.LimitsConsumer.Close()
 		close(messages)
 		close(kc.terminate)
 	}()
@@ -127,7 +138,50 @@ func (kc *KafkaFlowConsumer) Consume() (chan FlowData, chan string) {
 }
 
 // Close terminates the rdkafka consumer
-func (kc *KafkaFlowConsumer) Close() {
+func (kc *KafkaConsumer) Close() {
 	kc.terminate <- struct{}{}
 	<-kc.terminate
+}
+
+func receiveLoop(
+	consumer RdKafkaConsumer,
+	terminate <-chan struct{},
+) (messages chan *kafka.Message, info chan string) {
+	messages = make(chan *kafka.Message)
+	info = make(chan string)
+
+	go func() {
+	receiving:
+		for {
+			select {
+			case <-terminate:
+				break receiving
+
+			case ev := <-consumer.Events():
+				switch e := ev.(type) {
+				case kafka.AssignedPartitions:
+					consumer.Assign(e.Partitions)
+					info <- e.String()
+
+				case kafka.RevokedPartitions:
+					consumer.Unassign()
+					info <- e.String()
+
+				case kafka.Error:
+					info <- "Error: " + e.String()
+
+				case *kafka.Message:
+					messages <- e
+
+				default:
+					info <- e.String()
+				}
+			}
+		}
+
+		close(messages)
+		close(info)
+	}()
+
+	return messages, info
 }

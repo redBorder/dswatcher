@@ -28,18 +28,23 @@ type DynamicSensorsWatcherConfig struct {
 	Broker struct {
 		Address       string   `yaml:"address"`
 		ConsumerGroup string   `yaml:"consumer_group"`
-		Topics        []string `yaml:"topics"`
+		NetflowTopics []string `yaml:"netflow_topics"`
+		LimitsTopics  []string `yaml:"limits_topics"`
 	}
+
 	Decoder struct {
-		ElementID int `yaml:"element_id"`
+		ElementID        int `yaml:"element_id"`
+		OptionTemplateID int `yaml:"option_template_id"`
 	}
+
 	Updater struct {
-		URL            string `yaml:"chef_server_url"`
-		Key            string `yaml:"client_key"`
-		NodeName       string `yaml:"node_name"`
-		Path           string `yaml:"attribute_path"`
-		UpdateInterval int64  `yaml:"update_interval_s"`
-		FetchInterval  int64  `yaml:"fetch_interval_s"`
+		URL              string `yaml:"chef_server_url"`
+		Key              string `yaml:"client_key"`
+		NodeName         string `yaml:"node_name"`
+		SerialNumberPath string `yaml:"serial_number_path"`
+		SensorUUIDPath   string `yaml:"sensor_uuid_path"`
+		UpdateInterval   int64  `yaml:"update_interval_s"`
+		FetchInterval    int64  `yaml:"fetch_interval_s"`
 	}
 }
 
