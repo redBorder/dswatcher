@@ -107,9 +107,8 @@ func (cu *ChefUpdater) FetchNodes() error {
 // UpdateNode gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error {
-	deviceIDStr := strconv.FormatUint(uint64(deviceID), 10)
-	node, err := findNode(cu.DeviceIDPath, deviceIDStr, cu.nodes)
+func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uint32) error {
+	node, err := findNode(cu.DeviceIDPath, serialNumber, cu.nodes)
 	if err != nil {
 		return err
 	}
