@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/decoder"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/updater"
+	"github.com/redBorder/dswatcher/internal/consumer"
+	"github.com/redBorder/dswatcher/internal/decoder"
+	"github.com/redBorder/dswatcher/internal/updater"
 )
 
 var version string
