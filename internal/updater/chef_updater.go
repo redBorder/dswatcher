@@ -118,10 +118,6 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, deviceID, obsID uint32) error 
 		return errors.New("Node not found")
 	}
 
-	if node == nil {
-		return errors.New("Node not found")
-	}
-
 	attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
 	if err != nil {
 		return err

@@ -107,6 +107,9 @@ func main() {
 	}
 
 	err = chefUpdater.FetchNodes()
+	if err != nil {
+		logrus.Errorln("Error fetching nodes: " + err.Error())
+	}
 
 	ticker := time.NewTicker(
 		time.Duration(config.Updater.FetchInterval) * time.Second)
@@ -115,7 +118,7 @@ func main() {
 		for range ticker.C {
 			err = chefUpdater.FetchNodes()
 			if err != nil {
-				logrus.Warn("Error fetching nodes: " + err.Error())
+				logrus.Errorln("Error fetching nodes: " + err.Error())
 			}
 		}
 	}()
@@ -165,7 +168,7 @@ func main() {
 
 			err = chefUpdater.UpdateNode(ip, deviceID, obsID)
 			if err != nil {
-				logrus.Warn("Error updating node: " + err.Error())
+				logrus.Warnln("Error updating node: " + err.Error())
 				continue
 			}
 
@@ -208,7 +211,7 @@ func main() {
 			}
 
 			if blocked {
-				logrus.Info("Blocked UUID: " + uuid)
+				logrus.Infoln("Blocked UUID: " + uuid)
 			}
 		}
 
