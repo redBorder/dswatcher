@@ -97,11 +97,11 @@ func main() {
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:            config.Updater.URL,
-		AccessKey:      string(key),
-		Name:           config.Updater.NodeName,
-		DeviceIDPath:   config.Updater.DeviceIDPath,
-		SensorUUIDPath: config.Updater.SensorUUIDPath,
+		URL:              config.Updater.URL,
+		AccessKey:        string(key),
+		Name:             config.Updater.NodeName,
+		SerialNumberPath: config.Updater.SerialNumberPath,
+		SensorUUIDPath:   config.Updater.SensorUUIDPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())

@@ -39,11 +39,11 @@ type ChefAPIClient interface {
 type ChefUpdaterConfig struct {
 	client *chef.Client
 
-	Name           string
-	URL            string
-	AccessKey      string
-	DeviceIDPath   string
-	SensorUUIDPath string
+	Name             string
+	URL              string
+	AccessKey        string
+	SerialNumberPath string
+	SensorUUIDPath   string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -88,7 +88,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
+		attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
@@ -108,7 +108,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uint32) error {
-	node, err := findNode(cu.DeviceIDPath, serialNumber, cu.nodes)
+	node, err := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uin
 		return errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.DeviceIDPath)
+	attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
 	if err != nil {
 		return err
 	}

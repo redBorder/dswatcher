@@ -38,13 +38,13 @@ type DynamicSensorsWatcherConfig struct {
 	}
 
 	Updater struct {
-		URL            string `yaml:"chef_server_url"`
-		Key            string `yaml:"client_key"`
-		NodeName       string `yaml:"node_name"`
-		DeviceIDPath   string `yaml:"device_id_path"`
-		SensorUUIDPath string `yaml:"sensor_uuid_path"`
-		UpdateInterval int64  `yaml:"update_interval_s"`
-		FetchInterval  int64  `yaml:"fetch_interval_s"`
+		URL              string `yaml:"chef_server_url"`
+		Key              string `yaml:"client_key"`
+		NodeName         string `yaml:"node_name"`
+		SerialNumberPath string `yaml:"serial_number_path"`
+		SensorUUIDPath   string `yaml:"sensor_uuid_path"`
+		UpdateInterval   int64  `yaml:"update_interval_s"`
+		FetchInterval    int64  `yaml:"fetch_interval_s"`
 	}
 }
 
