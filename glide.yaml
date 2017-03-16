@@ -1,15 +1,12 @@
-package: github.com/redBorder/dynamic-sensors-watcher
+package: github.com/redBorder/dswatcher
 import:
 - package: github.com/confluentinc/confluent-kafka-go
   version: ~0.9.4
   subpackages:
   - kafka
 - package: github.com/tehmaze/netflow
-  subpackages:
-  - ipfix
-  - session
-- package: github.com/go-chef/chef
-  version: a27a34ded3f4ab05bc5c4def0f61eb10272cc246
+  version: 3262c0d46619ea505a794c10459d23107dd8b34a
+  repo: https://github.com/Bigomby/netflow.git
 testImport:
 - package: github.com/smartystreets/goconvey
   version: ~1.6.2

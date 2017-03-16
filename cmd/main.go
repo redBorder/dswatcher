@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/decoder"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/updater"
+	"github.com/redBorder/dswatcher/internal/consumer"
+	"github.com/redBorder/dswatcher/internal/decoder"
+	"github.com/redBorder/dswatcher/internal/updater"
 )
 
 var version string
@@ -80,7 +80,8 @@ func main() {
 	//////////////////////
 
 	decoderConfig := decoder.Netflow10DecoderConfig{
-		ElementID: uint16(config.Decoder.ElementID),
+		ElementID:        uint16(config.Decoder.ElementID),
+		OptionTemplateID: uint16(config.Decoder.OptionTemplateID),
 	}
 	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
 
@@ -88,7 +89,7 @@ func main() {
 	// Chef updater //
 	///////////////////
 
-	lastUpdated := make(map[uint32]time.Time)
+	lastUpdated := make(map[string]time.Time)
 
 	key, err := ioutil.ReadFile(config.Updater.Key)
 	if err != nil {
@@ -107,6 +108,9 @@ func main() {
 	}
 
 	err = chefUpdater.FetchNodes()
+	if err != nil {
+		logrus.Errorln("Error fetching nodes: " + err.Error())
+	}
 
 	ticker := time.NewTicker(
 		time.Duration(config.Updater.FetchInterval) * time.Second)
@@ -115,7 +119,7 @@ func main() {
 		for range ticker.C {
 			err = chefUpdater.FetchNodes()
 			if err != nil {
-				logrus.Warn("Error fetching nodes: " + err.Error())
+				logrus.Errorln("Error fetching nodes: " + err.Error())
 			}
 		}
 	}()
@@ -149,7 +153,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for message := range nfMessages {
-			deviceID, obsID, err := nfDecoder.Decode(message.IP, message.Data)
+			serialNumber, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln("Error decoding netflow: " + err.Error())
 				continue
@@ -158,26 +162,26 @@ func main() {
 			ip := make(net.IP, 4)
 			binary.BigEndian.PutUint32(ip, message.IP)
 
-			if deviceID == 0 {
+			if len(serialNumber) > 0 {
 				logrus.Debugf("Message without Device ID from: %s", ip.String())
 				continue
 			}
 
-			err = chefUpdater.UpdateNode(ip, deviceID, obsID)
+			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
 			if err != nil {
-				logrus.Warn("Error updating node: " + err.Error())
+				logrus.Warnln("Error updating node: " + err.Error())
 				continue
 			}
 
-			if time.Since(lastUpdated[deviceID]) <
+			if time.Since(lastUpdated[serialNumber]) <
 				time.Duration(config.Updater.UpdateInterval)*time.Second {
 				continue
 			}
 
-			lastUpdated[deviceID] = time.Now()
+			lastUpdated[serialNumber] = time.Now()
 			logrus.Infof(
 				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
-				ip.String(), deviceID, obsID)
+				ip.String(), serialNumber, obsID)
 		}
 
 		wg.Done()
@@ -208,7 +212,7 @@ func main() {
 			}
 
 			if blocked {
-				logrus.Info("Blocked UUID: " + uuid)
+				logrus.Infoln("Blocked UUID: " + uuid)
 			}
 		}
 

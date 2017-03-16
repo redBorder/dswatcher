@@ -31,9 +31,12 @@ type DynamicSensorsWatcherConfig struct {
 		NetflowTopics []string `yaml:"netflow_topics"`
 		LimitsTopics  []string `yaml:"limits_topics"`
 	}
+
 	Decoder struct {
-		ElementID int `yaml:"element_id"`
+		ElementID        int `yaml:"element_id"`
+		OptionTemplateID int `yaml:"option_template_id"`
 	}
+
 	Updater struct {
 		URL            string `yaml:"chef_server_url"`
 		Key            string `yaml:"client_key"`

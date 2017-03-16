@@ -22,7 +22,7 @@ import (
 	"runtime"
 
 	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/redBorder/dynamic-sensors-watcher/internal/consumer"
+	"github.com/redBorder/dswatcher/internal/consumer"
 )
 
 // PrintVersion displays the application version.
