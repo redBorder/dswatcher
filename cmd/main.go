@@ -162,14 +162,7 @@ func main() {
 			ip := make(net.IP, 4)
 			binary.BigEndian.PutUint32(ip, message.IP)
 
-			if len(serialNumber) > 0 {
-				logrus.Debugf("Message without Device ID from: %s", ip.String())
-				continue
-			}
-
-			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
-			if err != nil {
-				logrus.Warnln("Error updating node: " + err.Error())
+			if len(serialNumber) == 0 {
 				continue
 			}
 
@@ -179,6 +172,14 @@ func main() {
 			}
 
 			lastUpdated[serialNumber] = time.Now()
+
+			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
+			if err != nil {
+				logrus.Warnf("Error updating node with serial number %s: %s",
+					serialNumber, err.Error())
+				continue
+			}
+
 			logrus.Infof(
 				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
 				ip.String(), serialNumber, obsID)
