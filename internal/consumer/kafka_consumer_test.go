@@ -207,7 +207,7 @@ func TestNetflowConsumer(t *testing.T) {
 			})
 		})
 
-		Convey("When an error ocurred", func() {
+		Convey("When an error occurred", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
 			rdConsumer.On("Close").Return(nil)

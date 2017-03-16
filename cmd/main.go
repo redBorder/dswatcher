@@ -97,11 +97,11 @@ func main() {
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:            config.Updater.URL,
-		AccessKey:      string(key),
-		Name:           config.Updater.NodeName,
-		DeviceIDPath:   config.Updater.DeviceIDPath,
-		SensorUUIDPath: config.Updater.SensorUUIDPath,
+		URL:              config.Updater.URL,
+		AccessKey:        string(key),
+		Name:             config.Updater.NodeName,
+		SerialNumberPath: config.Updater.SerialNumberPath,
+		SensorUUIDPath:   config.Updater.SensorUUIDPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())
@@ -162,14 +162,7 @@ func main() {
 			ip := make(net.IP, 4)
 			binary.BigEndian.PutUint32(ip, message.IP)
 
-			if len(serialNumber) > 0 {
-				logrus.Debugf("Message without Device ID from: %s", ip.String())
-				continue
-			}
-
-			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
-			if err != nil {
-				logrus.Warnln("Error updating node: " + err.Error())
+			if len(serialNumber) == 0 {
 				continue
 			}
 
@@ -179,6 +172,14 @@ func main() {
 			}
 
 			lastUpdated[serialNumber] = time.Now()
+
+			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
+			if err != nil {
+				logrus.Warnf("Error updating node with serial number %s: %s",
+					serialNumber, err.Error())
+				continue
+			}
+
 			logrus.Infof(
 				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
 				ip.String(), serialNumber, obsID)
