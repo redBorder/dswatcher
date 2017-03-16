@@ -42,7 +42,7 @@ ifndef GLIDE
 	$(error glide is not installed)
 endif
 	@printf "$(MKL_BLUE)[DEPS]$(MKL_CLR_RESET)  Resolving dependencies\n"
-	@glide update
+	@glide install
 
 clean:
 	rm -f $(BIN)
