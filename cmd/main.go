@@ -183,7 +183,7 @@ func main() {
 			}
 
 			logrus.Infof(
-				"Updated sensor [IP: %s | DEVICE_ID: %d | OBS. Domain ID: %d]",
+				"Updated sensor [IP: %s | SERIAL_NUMBER: %s | OBS. Domain ID: %d]",
 				ip.String(), serialNumber, obsID)
 		}
 
