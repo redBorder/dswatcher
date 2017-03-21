@@ -39,11 +39,13 @@ type ChefAPIClient interface {
 type ChefUpdaterConfig struct {
 	client *chef.Client
 
-	Name             string
-	URL              string
-	AccessKey        string
-	SerialNumberPath string
-	SensorUUIDPath   string
+	Name              string
+	URL               string
+	AccessKey         string
+	SerialNumberPath  string
+	SensorUUIDPath    string
+	ObservationIDPath string
+	IPAddressPath     string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -117,13 +119,20 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uin
 		return errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
+	ipaddressAttributes, err := getAttributes(node.NormalAttributes, cu.ChefUpdaterConfig.IPAddressPath)
 	if err != nil {
 		return err
 	}
 
-	attributes["ipaddress"] = address.String()
-	attributes["observation_id"] = strconv.FormatUint(uint64(obsID), 10)
+	observationIDAttributes, err := getAttributes(node.NormalAttributes, cu.ChefUpdaterConfig.ObservationIDPath)
+	if err != nil {
+		return err
+	}
+
+	ipaddressAttributes[getKeyFromPath(cu.ChefUpdaterConfig.IPAddressPath)] =
+		address.String()
+	observationIDAttributes[getKeyFromPath(cu.ChefUpdaterConfig.ObservationIDPath)] =
+		strconv.FormatUint(uint64(obsID), 10)
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
