@@ -8,7 +8,6 @@
 * [Installing](#installing)
 * [Usage](#usage)
 * [Configuration](#configuration)
-* [Roadmap](#roadmap)
 
 ## Overview
 
@@ -88,15 +87,8 @@ updater:
   client_key: key.pem                           # Path to the key used for Chef authorization
   serial_number_path: redBorder/serial_number   # Path to the serial number of the sensor on Chef
   sensor_uuid_path: redBorder/sensor_uuid       # Path to the UUID of the sensor on Chef
+  ipaddress_path: ipaddress                     # Path to the IP address of the sensor to update
+  observation_id_path: redBorder/observation_id # Path to the Observation Domain ID to update
   fetch_interval_s: 60                          # Time between updates of the internal sensors database
   update_interval_s: 30                         # Time between updates of the Chef node
 ```
-
-## Roadmap
-
-| Version  | Feature             | Status    |
-|----------|---------------------|-----------|
-| 0.1      | Kafka consumer      | Done      |
-| 0.2      | Netflow decoder     | Done      |
-| 0.3      | Chef updater        | Done      |
-| 0.4      | Blocking sensors    | Done      |
