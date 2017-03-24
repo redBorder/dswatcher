@@ -169,8 +169,8 @@ func main() {
 
 			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
 			if err != nil {
-				logrus.Warnf("Error updating node with serial number %s: %s",
-					serialNumber, err.Error())
+				logrus.Warnf("Error updating node [%s | %s]: %s",
+					serialNumber, ip.String(), err.Error())
 				continue
 			}
 
