@@ -101,10 +101,11 @@ func TestFindNode(t *testing.T) {
 
 func TestBlockSensors(t *testing.T) {
 	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		URL:            "locahost",
-		AccessKey:      testPEMKey,
-		Name:           "test",
-		SensorUUIDPath: "org/uuid",
+		URL:               "locahost",
+		AccessKey:         testPEMKey,
+		Name:              "test",
+		SensorUUIDPath:    "org/uuid",
+		BlockedStatusPath: "org/blocked",
 	})
 	assert.NoError(t, err)
 
@@ -112,14 +113,18 @@ func TestBlockSensors(t *testing.T) {
 
 	blocked, err := chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
-	attributes, err := getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	attributes, err := getAttributes(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
 	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
 	assert.True(t, blocked)
 
 	blocked, err = chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
-	attributes, err = getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	attributes, err = getAttributes(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
 	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
 	assert.False(t, blocked)
@@ -127,5 +132,4 @@ func TestBlockSensors(t *testing.T) {
 	blocked, err = chefUpdater.BlockSensor("7777")
 	assert.Error(t, err)
 	assert.False(t, blocked)
-
 }

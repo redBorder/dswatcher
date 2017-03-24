@@ -104,6 +104,7 @@ func main() {
 		SensorUUIDPath:    config.Updater.SensorUUIDPath,
 		ObservationIDPath: config.Updater.ObservationIDPath,
 		IPAddressPath:     config.Updater.IPAddressPath,
+		BlockedStatusPath: config.Updater.BlocketStatusPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())
@@ -114,17 +115,8 @@ func main() {
 		logrus.Errorln("Error fetching nodes: " + err.Error())
 	}
 
-	ticker := time.NewTicker(
-		time.Duration(config.Updater.FetchInterval) * time.Second)
-
-	go func() {
-		for range ticker.C {
-			err = chefUpdater.FetchNodes()
-			if err != nil {
-				logrus.Errorln("Error fetching nodes: " + err.Error())
-			}
-		}
-	}()
+	fetchSignal :=
+		time.NewTicker(time.Duration(config.Updater.FetchInterval) * time.Second)
 
 	////////////////////
 	// Kafka consumer //
@@ -206,16 +198,43 @@ func main() {
 
 	wg.Add(1)
 	go func() {
-		for uuid := range limitsMessages {
-			blocked, err := chefUpdater.BlockSensor(updater.UUID(uuid))
+	receiving:
+		for {
+			select {
+			case <-fetchSignal.C:
+				err = chefUpdater.FetchNodes()
+				if err != nil {
+					logrus.Errorln("Error fetching nodes: " + err.Error())
+				}
 
-			if err != nil {
-				logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
-				continue
-			}
+			case message, ok := <-limitsMessages:
+				if ok {
+					break receiving
+				}
 
-			if blocked {
-				logrus.Infoln("Blocked UUID: " + uuid)
+				switch m := message.(type) {
+				case consumer.UUID:
+					uuid := updater.UUID(m)
+					blocked, err := chefUpdater.BlockSensor(uuid)
+
+					if err != nil {
+						logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
+						continue
+					}
+
+					if blocked {
+						logrus.Infoln("Blocked UUID: " + uuid)
+					}
+
+				case consumer.ResetSignal:
+					err := chefUpdater.ResetSensors()
+					if err != nil {
+						logrus.Errorf("Error resetting sensors: %s", err.Error())
+						continue
+					}
+
+					logrus.Infoln("All sensors have been reset")
+				}
 			}
 		}
 

@@ -301,7 +301,7 @@ func TestLimitsConsumer(t *testing.T) {
 		assert.NotNil(t, consumer)
 		assert.NotNil(t, consumer.terminate)
 
-		Convey("When a message is received", func() {
+		Convey("When a limit reached message is received", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
 			rdConsumer.On("Close").Return(nil)
@@ -309,8 +309,8 @@ func TestLimitsConsumer(t *testing.T) {
 			events <- &kafka.Message{
 				Value: []byte(
 					`{
-						 "type": "data",
-						 "monitor": "uuid_limit_reached",
+						 "monitor": "alert",
+						 "type": "limit_reached",
 						 "uuid": "7416ba90-926b-475f-a26e-53fe1a7e3c36",
 						 "timestamp": 1489057426
 					 }`),
@@ -319,7 +319,61 @@ func TestLimitsConsumer(t *testing.T) {
 			Convey("The message should be consumed", func() {
 				messages, _ := consumer.ConsumeLimits()
 				msg := <-messages
-				So(msg, ShouldEqual, "7416ba90-926b-475f-a26e-53fe1a7e3c36")
+
+				uuid, ok := msg.(UUID)
+				So(ok, ShouldBeTrue)
+				So(uuid, ShouldEqual, "7416ba90-926b-475f-a26e-53fe1a7e3c36")
+
+				consumer.Close()
+				rdConsumer.AssertExpectations(t)
+			})
+		})
+
+		Convey("When a counters reset message is received", func() {
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
+
+			events <- &kafka.Message{
+				Value: []byte(
+					`{
+						 "monitor": "alert",
+						 "type": "counters_reset",
+						 "timestamp": 1489057426
+					 }`),
+			}
+
+			Convey("The message should be consumed", func() {
+				messages, _ := consumer.ConsumeLimits()
+				msg := <-messages
+
+				_, ok := msg.(ResetSignal)
+				So(ok, ShouldBeTrue)
+
+				consumer.Close()
+				rdConsumer.AssertExpectations(t)
+			})
+		})
+
+		Convey("When an unknown message is received", func() {
+			events := make(chan kafka.Event, 1)
+			rdConsumer.On("Events").Return(events)
+			rdConsumer.On("Close").Return(nil)
+
+			events <- &kafka.Message{
+				Value: []byte(
+					`{
+						 "monitor": "alert",
+						 "type": "unknown_message",
+						 "timestamp": 1489057426
+					 }`),
+			}
+
+			Convey("Should send an info message", func() {
+				_, info := consumer.ConsumeLimits()
+				msg := <-info
+
+				So(msg, ShouldEqual, "Unknown alert received")
 
 				consumer.Close()
 				rdConsumer.AssertExpectations(t)

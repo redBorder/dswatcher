@@ -46,6 +46,7 @@ type ChefUpdaterConfig struct {
 	SensorUUIDPath    string
 	ObservationIDPath string
 	IPAddressPath     string
+	BlockedStatusPath string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -95,7 +96,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		sensorUUID, ok := attributes["sensor_uuid"].(string)
+		sensorUUID, ok := attributes[getKeyFromPath(cu.SensorUUIDPath)].(string)
 		if !ok {
 			continue
 		}
@@ -109,7 +110,9 @@ func (cu *ChefUpdater) FetchNodes() error {
 // UpdateNode gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uint32) error {
+func (cu *ChefUpdater) UpdateNode(
+	address net.IP, serialNumber string, obsID uint32) error {
+
 	node, err := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
 	if err != nil {
 		return err
@@ -119,19 +122,20 @@ func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uin
 		return errors.New("Node not found")
 	}
 
-	ipaddressAttributes, err := getAttributes(node.NormalAttributes, cu.ChefUpdaterConfig.IPAddressPath)
+	ipaddressAttributes, err :=
+		getAttributes(node.NormalAttributes, cu.IPAddressPath)
 	if err != nil {
 		return err
 	}
 
-	observationIDAttributes, err := getAttributes(node.NormalAttributes, cu.ChefUpdaterConfig.ObservationIDPath)
+	observationIDAttributes, err :=
+		getAttributes(node.NormalAttributes, cu.ObservationIDPath)
 	if err != nil {
 		return err
 	}
 
-	ipaddressAttributes[getKeyFromPath(cu.ChefUpdaterConfig.IPAddressPath)] =
-		address.String()
-	observationIDAttributes[getKeyFromPath(cu.ChefUpdaterConfig.ObservationIDPath)] =
+	ipaddressAttributes[getKeyFromPath(cu.IPAddressPath)] = address.String()
+	observationIDAttributes[getKeyFromPath(cu.ObservationIDPath)] =
 		strconv.FormatUint(uint64(obsID), 10)
 
 	cu.client.Nodes.Put(*node)
@@ -155,18 +159,19 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 		return false, errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.SensorUUIDPath)
+	attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
 	if err != nil {
 		return false, err
 	}
 
-	if blocked, ok := attributes["blocked"].(bool); ok {
+	if blocked, ok :=
+		attributes[getKeyFromPath(cu.BlockedStatusPath)].(bool); ok {
 		if blocked {
 			return false, nil
 		}
 	}
 
-	attributes["blocked"] = true
+	attributes[getKeyFromPath(cu.BlockedStatusPath)] = true
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
@@ -175,6 +180,28 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 
 	return true, nil
 }
+
+// ResetSensors sets the blocked status to false for every sensor.
+func (cu *ChefUpdater) ResetSensors() error {
+	for _, node := range cu.nodes {
+		attributes, err :=
+			getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			return err
+		}
+
+		attributes[getKeyFromPath(cu.BlockedStatusPath)] = false
+
+		cu.client.Nodes.Put(*node)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 // getAttributes receives the root object containing all the attributes of the
 // node and returns the inner object given a path

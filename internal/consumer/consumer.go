@@ -17,8 +17,14 @@
 
 package consumer
 
+// Message can be either an UUID to be blocked or a ResetSignal
+type Message interface{}
+
 // UUID identifies the sensor that reached the limit
 type UUID string
+
+// ResetSignal notifies that all sensors should be unblocked.
+type ResetSignal struct{}
 
 // FlowData contains the IP address of the Netflow exporter and the flow itself
 type FlowData struct {
