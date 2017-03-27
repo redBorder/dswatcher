@@ -113,11 +113,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 func (cu *ChefUpdater) UpdateNode(
 	address net.IP, serialNumber string, obsID uint32) error {
 
-	node, err := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
-	if err != nil {
-		return err
-	}
-
+	node := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
 	if node == nil {
 		return errors.New("Node not found")
 	}
@@ -175,11 +171,7 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
-	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
-	if err != nil {
-		return false, err
-	}
-
+	node := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
 	if node == nil {
 		return false, errors.New("Node not found")
 	}
@@ -250,7 +242,7 @@ func getAttributes(
 }
 
 func findNode(keyPath string, value string, nodes map[string]*chef.Node,
-) (node *chef.Node, err error) {
+) (node *chef.Node) {
 	key := getKeyFromPath(keyPath)
 
 	for _, node := range nodes {
@@ -260,11 +252,11 @@ func findNode(keyPath string, value string, nodes map[string]*chef.Node,
 		}
 
 		if attributes[key] == value {
-			return node, nil
+			return node
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func getKeyFromPath(path string) string {
