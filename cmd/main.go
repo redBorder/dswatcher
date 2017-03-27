@@ -89,8 +89,6 @@ func main() {
 	// Chef updater //
 	///////////////////
 
-	lastUpdated := make(map[string]time.Time)
-
 	key, err := ioutil.ReadFile(config.Updater.Key)
 	if err != nil {
 		logrus.Fatal("Error reading client Key: " + err.Error())
@@ -146,6 +144,8 @@ func main() {
 
 	wg.Add(1)
 	go func() {
+		lastUpdated := make(map[string]time.Time)
+
 		for message := range nfMessages {
 			serialNumber, obsID, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
@@ -198,6 +198,8 @@ func main() {
 
 	wg.Add(1)
 	go func() {
+		var lastBlocked time.Time
+
 	receiving:
 		for {
 			select {
@@ -208,29 +210,49 @@ func main() {
 				}
 
 			case message, ok := <-limitsMessages:
-				if ok {
+				if !ok {
 					break receiving
 				}
 
 				switch m := message.(type) {
 				case consumer.UUID:
-					uuid := updater.UUID(m)
-					blocked, err := chefUpdater.BlockSensor(uuid)
-
-					if err != nil {
-						logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
-						continue
+					if time.Since(lastBlocked) <
+						time.Duration(config.Updater.UpdateInterval)*time.Second {
+						continue receiving
 					}
 
-					if blocked {
-						logrus.Infoln("Blocked UUID: " + uuid)
+					lastBlocked = time.Now()
+					uuid := updater.UUID(m)
+
+					if uuid == "*" {
+						errs := chefUpdater.BlockAllSensors()
+
+						if len(errs) == 0 {
+							logrus.Infoln("Blocked all sensors")
+						} else {
+							logrus.Warnf("Not all sensors could be blocked")
+						}
+
+						for _, err := range errs {
+							logrus.Warnf("Error blocking sensor: %s", err.Error())
+						}
+					} else {
+						blocked, err := chefUpdater.BlockSensor(uuid)
+						if err != nil {
+							logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
+							continue receiving
+						}
+
+						if blocked {
+							logrus.Infoln("Blocked UUID: " + uuid)
+						}
 					}
 
 				case consumer.ResetSignal:
 					err := chefUpdater.ResetSensors()
 					if err != nil {
 						logrus.Errorf("Error resetting sensors: %s", err.Error())
-						continue
+						continue receiving
 					}
 
 					logrus.Infoln("All sensors have been reset")

@@ -146,10 +146,35 @@ func (cu *ChefUpdater) UpdateNode(
 	return nil
 }
 
+// BlockAllSensors iterates a node list and block all sensor on the list.
+func (cu *ChefUpdater) BlockAllSensors() []error {
+	var errs []error
+	key := getKeyFromPath(cu.BlockedStatusPath)
+
+	for _, node := range cu.nodes {
+		attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		attributes[key] = true
+
+		cu.client.Nodes.Put(*node)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
 // BlockSensor gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
+	key := getKeyFromPath(cu.BlockedStatusPath)
+
 	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
 	if err != nil {
 		return false, err
@@ -165,13 +190,13 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 	}
 
 	if blocked, ok :=
-		attributes[getKeyFromPath(cu.BlockedStatusPath)].(bool); ok {
+		attributes[key].(bool); ok {
 		if blocked {
 			return false, nil
 		}
 	}
 
-	attributes[getKeyFromPath(cu.BlockedStatusPath)] = true
+	attributes[key] = true
 
 	cu.client.Nodes.Put(*node)
 	if err != nil {
@@ -183,6 +208,8 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 
 // ResetSensors sets the blocked status to false for every sensor.
 func (cu *ChefUpdater) ResetSensors() error {
+	key := getKeyFromPath(cu.BlockedStatusPath)
+
 	for _, node := range cu.nodes {
 		attributes, err :=
 			getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
@@ -190,7 +217,7 @@ func (cu *ChefUpdater) ResetSensors() error {
 			return err
 		}
 
-		attributes[getKeyFromPath(cu.BlockedStatusPath)] = false
+		attributes[key] = false
 
 		cu.client.Nodes.Put(*node)
 		if err != nil {
