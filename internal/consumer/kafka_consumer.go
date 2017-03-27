@@ -25,6 +25,15 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
+type limitMessage struct {
+	Monitor      string `yaml:"monitor"`
+	Type         string `yaml:"type"`
+	UUID         string `yaml:"uuid"`
+	CurrentBytes string `yaml:"current_bytes"`
+	Limit        string `yaml:"limit"`
+	Timestamp    int64  `yaml:"timestamp"`
+}
+
 ///////////////
 //Interfaces //
 ///////////////
@@ -117,16 +126,25 @@ func (kc *KafkaConsumer) ConsumeNetflow() (chan FlowData, chan string) {
 // ConsumeLimits receives limits messages from the kafka broker.
 // "messages" channel receives actual messages and "info" channel receives
 // notifications from the Kafka broker.
-func (kc *KafkaConsumer) ConsumeLimits() (chan UUID, chan string) {
-	messages := make(chan UUID)
+func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
+	messages := make(chan Message)
 	inputMessages, info := receiveLoop(kc.LimitsConsumer, kc.terminate)
 
 	go func() {
 		for m := range inputMessages {
-			var data struct{ UUID string }
+			var data limitMessage
 			json.Unmarshal(m.Value, &data)
 
-			messages <- UUID(data.UUID)
+			switch data.Type {
+			case "limit_reached":
+				messages <- UUID(data.UUID)
+
+			case "counters_reset":
+				messages <- ResetSignal{}
+
+			default:
+				info <- "Unknown alert received"
+			}
 		}
 
 		kc.LimitsConsumer.Close()

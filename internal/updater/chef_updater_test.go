@@ -55,11 +55,13 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			},
 		},
 	}
-	nodes["3"] = &chef.Node{
+
+	nodes["2"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{},
 		},
 	}
+
 	nodes["3"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"uuid": "9999",
@@ -78,33 +80,28 @@ func TestGetKeyFromPath(t *testing.T) {
 func TestFindNode(t *testing.T) {
 	nodes := bootstrapSensorsDB()
 
-	node, err := findNode("org/uuid", "0000", nodes)
-	assert.NoError(t, err)
+	node := findNode("org/uuid", "0000", nodes)
 	assert.Equal(t, nodes["0"], node)
 
-	node, err = findNode("org2/uuid", "1111", nodes)
-	assert.NoError(t, err)
+	node = findNode("org2/uuid", "1111", nodes)
 	assert.Equal(t, nodes["1"], node)
 
-	node, err = findNode("uuid", "9999", nodes)
-	assert.NoError(t, err)
+	node = findNode("uuid", "9999", nodes)
 	assert.Equal(t, nodes["3"], node)
 
-	node, err = findNode("org/uuid", "1234", nodes)
-	assert.NoError(t, err)
+	node = findNode("org/uuid", "1234", nodes)
 	assert.Nil(t, node)
 
-	node, err = findNode("org", "", nodes)
-	assert.NoError(t, err)
+	node = findNode("org", "", nodes)
 	assert.Nil(t, node)
 }
 
 func TestBlockSensors(t *testing.T) {
 	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		URL:            "locahost",
-		AccessKey:      testPEMKey,
-		Name:           "test",
-		SensorUUIDPath: "org/uuid",
+		AccessKey:         testPEMKey,
+		Name:              "test",
+		SensorUUIDPath:    "org/uuid",
+		BlockedStatusPath: "org/blocked",
 	})
 	assert.NoError(t, err)
 
@@ -112,14 +109,18 @@ func TestBlockSensors(t *testing.T) {
 
 	blocked, err := chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
-	attributes, err := getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	attributes, err := getParent(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
 	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
 	assert.True(t, blocked)
 
 	blocked, err = chefUpdater.BlockSensor("0000")
 	assert.NoError(t, err)
-	attributes, err = getAttributes(chefUpdater.nodes["0"].NormalAttributes, "org/blocked")
+	attributes, err = getParent(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
 	assert.NoError(t, err)
 	assert.True(t, attributes["blocked"].(bool))
 	assert.False(t, blocked)
@@ -127,5 +128,81 @@ func TestBlockSensors(t *testing.T) {
 	blocked, err = chefUpdater.BlockSensor("7777")
 	assert.Error(t, err)
 	assert.False(t, blocked)
+}
 
+func TestBlockAllSensors(t *testing.T) {
+	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
+		AccessKey:         testPEMKey,
+		Name:              "test",
+		SensorUUIDPath:    "org/uuid",
+		BlockedStatusPath: "org/blocked",
+	})
+	assert.NoError(t, err)
+
+	chefUpdater.nodes = bootstrapSensorsDB()
+
+	errs := chefUpdater.BlockAllSensors()
+	assert.Equal(t, 2, len(errs))
+
+	var attributes map[string]interface{}
+	var ok bool
+
+	attributes, err = getParent(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+
+	assert.NoError(t, err)
+	assert.True(t, attributes["blocked"].(bool))
+
+	attributes, err = getParent(
+		chefUpdater.nodes["1"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+
+	assert.Error(t, err)
+	_, ok = attributes["blocked"].(bool)
+	assert.False(t, ok)
+
+	attributes, err = getParent(
+		chefUpdater.nodes["2"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+
+	assert.NoError(t, err)
+	assert.True(t, attributes["blocked"].(bool))
+
+	attributes, err = getParent(
+		chefUpdater.nodes["3"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+
+	assert.Error(t, err)
+	_, ok = attributes["blocked"].(bool)
+	assert.False(t, ok)
+}
+
+func TestResetSensors(t *testing.T) {
+	chefUpdater := &ChefUpdater{
+		nodes: bootstrapSensorsDB(),
+		ChefUpdaterConfig: ChefUpdaterConfig{
+			AccessKey:         testPEMKey,
+			Name:              "test",
+			SensorUUIDPath:    "org/uuid",
+			BlockedStatusPath: "org/blocked",
+		},
+	}
+
+	attributes0, err := getParent(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+	assert.NoError(t, err)
+	attributes2, err := getParent(
+		chefUpdater.nodes["2"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+	assert.NoError(t, err)
+
+	attributes0["blocked"] = true
+	attributes2["blocked"] = true
+
+	chefUpdater.ResetSensors()
+
+	assert.False(t, attributes0["blocked"].(bool))
+	assert.False(t, attributes2["blocked"].(bool))
 }
