@@ -134,9 +134,8 @@ func (cu *ChefUpdater) UpdateNode(
 	observationIDAttributes[getKeyFromPath(cu.ObservationIDPath)] =
 		strconv.FormatUint(uint64(obsID), 10)
 
-	cu.client.Nodes.Put(*node)
-	if err != nil {
-		return err
+	if cu.client != nil {
+		cu.client.Nodes.Put(*node)
 	}
 
 	return nil
@@ -156,9 +155,8 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 
 		attributes[key] = true
 
-		cu.client.Nodes.Put(*node)
-		if err != nil {
-			errs = append(errs, err)
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
 		}
 	}
 
@@ -190,9 +188,8 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 
 	attributes[key] = true
 
-	cu.client.Nodes.Put(*node)
-	if err != nil {
-		return false, err
+	if cu.client != nil {
+		cu.client.Nodes.Put(*node)
 	}
 
 	return true, nil
@@ -203,17 +200,15 @@ func (cu *ChefUpdater) ResetSensors() error {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
 	for _, node := range cu.nodes {
-		attributes, err :=
-			getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+		attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
 		if err != nil {
-			return err
+			continue
 		}
 
 		attributes[key] = false
 
-		cu.client.Nodes.Put(*node)
-		if err != nil {
-			return err
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
 		}
 	}
 
