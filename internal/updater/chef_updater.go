@@ -91,7 +91,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
+		attributes, err := getParent(node.NormalAttributes, cu.SerialNumberPath)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
@@ -119,13 +119,13 @@ func (cu *ChefUpdater) UpdateNode(
 	}
 
 	ipaddressAttributes, err :=
-		getAttributes(node.NormalAttributes, cu.IPAddressPath)
+		getParent(node.NormalAttributes, cu.IPAddressPath)
 	if err != nil {
 		return err
 	}
 
 	observationIDAttributes, err :=
-		getAttributes(node.NormalAttributes, cu.ObservationIDPath)
+		getParent(node.NormalAttributes, cu.ObservationIDPath)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
 	for _, node := range cu.nodes {
-		attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -174,7 +174,7 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 		return false, errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+	attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
 	if err != nil {
 		return false, err
 	}
@@ -200,7 +200,7 @@ func (cu *ChefUpdater) ResetSensors() error {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
 	for _, node := range cu.nodes {
-		attributes, err := getAttributes(node.NormalAttributes, cu.BlockedStatusPath)
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
 		if err != nil {
 			continue
 		}
@@ -217,19 +217,18 @@ func (cu *ChefUpdater) ResetSensors() error {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// getAttributes receives the root object containing all the attributes of the
+// getParent receives the root object containing all the attributes of the
 // node and returns the inner object given a path
-func getAttributes(
-	attributes map[string]interface{}, path string,
-) (map[string]interface{}, error) {
-	var ok bool
+func getParent(root map[string]interface{}, path string) (map[string]interface{}, error) {
 	keys := strings.Split(path, "/")
+	var ok bool
 
-	attrs := attributes
-	for i := 0; i < len(keys)-1; i++ {
-		attrs, ok = attributes[keys[i]].(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Cannot find key: " + path)
+	attrs := root
+	for i, key := range keys {
+		if i < len(keys)-1 {
+			if attrs, ok = attrs[key].(map[string]interface{}); !ok || attrs == nil {
+				return nil, errors.New("Cannot find key: " + path)
+			}
 		}
 	}
 
@@ -241,7 +240,7 @@ func findNode(keyPath string, value string, nodes map[string]*chef.Node,
 	key := getKeyFromPath(keyPath)
 
 	for _, node := range nodes {
-		attributes, err := getAttributes(node.NormalAttributes, keyPath)
+		attributes, err := getParent(node.NormalAttributes, keyPath)
 		if err != nil {
 			continue
 		}
