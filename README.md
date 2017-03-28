@@ -23,7 +23,8 @@ node with the *Serial number*. If this sensor exists, the IP address for the
 sensor and the Observation ID will be updated with the IP address and Observation
 ID of the Netflow sender.
 - `dswatcher` will listen for alerts about sensors that reached
-their limits. The sensor will be marked as blocked on the Chef node.
+their limits. The sensor will be marked as blocked on the Chef node. When no
+UUID is specified, i.e. `uuid == "*"` then all sensors will be blocked.
 - `dswatcher` will listen for alerts about counters resets. When this message
 is received all the sensors block status will be set to **false**.
 
@@ -89,7 +90,7 @@ updater:
   client_key: key.pem                           # Path to the key used for Chef authorization
   serial_number_path: org/serial_number         # Path to the serial number of the sensor on Chef
   sensor_uuid_path: org/sensor_uuid             # Path to the UUID of the sensor on Chef
-  ipaddress_path: ipaddress                     # Path to the IP address of the sensor to update
+  ipaddress_path: org/ipaddress                 # Path to the IP address of the sensor to update
   observation_id_path: org/observation_id       # Path to the Observation Domain ID to update
   fetch_interval_s: 60                          # Time between updates of the internal sensors database
   blocked_status_path: org/blocked              # Path to the block status
