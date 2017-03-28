@@ -39,11 +39,14 @@ type ChefAPIClient interface {
 type ChefUpdaterConfig struct {
 	client *chef.Client
 
-	Name             string
-	URL              string
-	AccessKey        string
-	SerialNumberPath string
-	SensorUUIDPath   string
+	Name              string
+	URL               string
+	AccessKey         string
+	SerialNumberPath  string
+	SensorUUIDPath    string
+	ObservationIDPath string
+	IPAddressPath     string
+	BlockedStatusPath string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -88,12 +91,12 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
+		attributes, err := getParent(node.NormalAttributes, cu.SerialNumberPath)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		sensorUUID, ok := attributes["sensor_uuid"].(string)
+		sensorUUID, ok := attributes[getKeyFromPath(cu.SensorUUIDPath)].(string)
 		if !ok {
 			continue
 		}
@@ -107,79 +110,125 @@ func (cu *ChefUpdater) FetchNodes() error {
 // UpdateNode gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) UpdateNode(address net.IP, serialNumber string, obsID uint32) error {
-	node, err := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
-	if err != nil {
-		return err
-	}
+func (cu *ChefUpdater) UpdateNode(
+	address net.IP, serialNumber string, obsID uint32) error {
 
+	node := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
 	if node == nil {
 		return errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.SerialNumberPath)
+	ipaddressAttributes, err :=
+		getParent(node.NormalAttributes, cu.IPAddressPath)
 	if err != nil {
 		return err
 	}
 
-	attributes["ipaddress"] = address.String()
-	attributes["observation_id"] = strconv.FormatUint(uint64(obsID), 10)
-
-	cu.client.Nodes.Put(*node)
+	observationIDAttributes, err :=
+		getParent(node.NormalAttributes, cu.ObservationIDPath)
 	if err != nil {
 		return err
+	}
+
+	ipaddressAttributes[getKeyFromPath(cu.IPAddressPath)] = address.String()
+	observationIDAttributes[getKeyFromPath(cu.ObservationIDPath)] =
+		strconv.FormatUint(uint64(obsID), 10)
+
+	if cu.client != nil {
+		cu.client.Nodes.Put(*node)
 	}
 
 	return nil
+}
+
+// BlockAllSensors iterates a node list and block all sensor on the list.
+func (cu *ChefUpdater) BlockAllSensors() []error {
+	var errs []error
+	key := getKeyFromPath(cu.BlockedStatusPath)
+
+	for _, node := range cu.nodes {
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		attributes[key] = true
+
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
+		}
+	}
+
+	return errs
 }
 
 // BlockSensor gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
-	node, err := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
-	if err != nil {
-		return false, err
-	}
+	key := getKeyFromPath(cu.BlockedStatusPath)
 
+	node := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
 	if node == nil {
 		return false, errors.New("Node not found")
 	}
 
-	attributes, err := getAttributes(node.NormalAttributes, cu.SensorUUIDPath)
+	attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
 	if err != nil {
 		return false, err
 	}
 
-	if blocked, ok := attributes["blocked"].(bool); ok {
+	if blocked, ok :=
+		attributes[key].(bool); ok {
 		if blocked {
 			return false, nil
 		}
 	}
 
-	attributes["blocked"] = true
+	attributes[key] = true
 
-	cu.client.Nodes.Put(*node)
-	if err != nil {
-		return false, err
+	if cu.client != nil {
+		cu.client.Nodes.Put(*node)
 	}
 
 	return true, nil
 }
 
-// getAttributes receives the root object containing all the attributes of the
-// node and returns the inner object given a path
-func getAttributes(
-	attributes map[string]interface{}, path string,
-) (map[string]interface{}, error) {
-	var ok bool
-	keys := strings.Split(path, "/")
+// ResetSensors sets the blocked status to false for every sensor.
+func (cu *ChefUpdater) ResetSensors() error {
+	key := getKeyFromPath(cu.BlockedStatusPath)
 
-	attrs := attributes
-	for i := 0; i < len(keys)-1; i++ {
-		attrs, ok = attributes[keys[i]].(map[string]interface{})
-		if !ok {
-			return nil, errors.New("Cannot find key: " + path)
+	for _, node := range cu.nodes {
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			continue
+		}
+
+		attributes[key] = false
+
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
+		}
+	}
+
+	return nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// getParent receives the root object containing all the attributes of the
+// node and returns the inner object given a path
+func getParent(root map[string]interface{}, path string) (map[string]interface{}, error) {
+	keys := strings.Split(path, "/")
+	var ok bool
+
+	attrs := root
+	for i, key := range keys {
+		if i < len(keys)-1 {
+			if attrs, ok = attrs[key].(map[string]interface{}); !ok || attrs == nil {
+				return nil, errors.New("Cannot find key: " + path)
+			}
 		}
 	}
 
@@ -187,21 +236,21 @@ func getAttributes(
 }
 
 func findNode(keyPath string, value string, nodes map[string]*chef.Node,
-) (node *chef.Node, err error) {
+) (node *chef.Node) {
 	key := getKeyFromPath(keyPath)
 
 	for _, node := range nodes {
-		attributes, err := getAttributes(node.NormalAttributes, keyPath)
+		attributes, err := getParent(node.NormalAttributes, keyPath)
 		if err != nil {
 			continue
 		}
 
 		if attributes[key] == value {
-			return node, nil
+			return node
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func getKeyFromPath(path string) string {
