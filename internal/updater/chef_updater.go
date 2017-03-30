@@ -47,6 +47,7 @@ type ChefUpdaterConfig struct {
 	ObservationIDPath string
 	IPAddressPath     string
 	BlockedStatusPath string
+	DeviceIDPath      string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -111,15 +112,38 @@ func (cu *ChefUpdater) FetchNodes() error {
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(
-	address net.IP, serialNumber string, obsID uint32) error {
+	address net.IP, serialNumber string, obsID uint32, deviceID uint32) error {
+	deviceIDKey := getKeyFromPath(cu.DeviceIDPath)
+
+	var (
+		ok               bool
+		nodeDeviceID     interface{}
+		nodeDeviceIDUint int
+	)
 
 	node := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
 	if node == nil {
 		return errors.New("Node not found")
 	}
 
-	ipaddressAttributes, err :=
-		getParent(node.NormalAttributes, cu.IPAddressPath)
+	deviceIDAttributes, err := getParent(node.NormalAttributes, cu.DeviceIDPath)
+	if err != nil {
+		return err
+	}
+
+	if nodeDeviceID, ok = deviceIDAttributes[deviceIDKey]; !ok {
+		return errors.New("Sensor " + serialNumber + " does not have a DeviceID")
+	}
+
+	if nodeDeviceIDUint, ok = nodeDeviceID.(int); !ok {
+		return errors.New("DeviceID is not integer")
+	}
+
+	if nodeDeviceIDUint != int(deviceID) {
+		return errors.New("DeviceID for " + address.String() + " does not match")
+	}
+
+	ipaddressAttributes, err := getParent(node.NormalAttributes, cu.IPAddressPath)
 	if err != nil {
 		return err
 	}

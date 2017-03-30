@@ -80,8 +80,9 @@ func main() {
 	//////////////////////
 
 	decoderConfig := decoder.Netflow10DecoderConfig{
-		ElementID:        uint16(config.Decoder.ElementID),
-		OptionTemplateID: uint16(config.Decoder.OptionTemplateID),
+		SerialNumberElementID: uint16(config.Decoder.ElementID),
+		DeviceTypeElementID:   uint16(config.Decoder.DeviceTypeElementID),
+		OptionTemplateID:      uint16(config.Decoder.OptionTemplateID),
 	}
 	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
 
@@ -103,6 +104,7 @@ func main() {
 		ObservationIDPath: config.Updater.ObservationIDPath,
 		IPAddressPath:     config.Updater.IPAddressPath,
 		BlockedStatusPath: config.Updater.BlocketStatusPath,
+		DeviceIDPath:      config.Updater.DeviceIDPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())
@@ -147,36 +149,41 @@ func main() {
 		lastUpdated := make(map[string]time.Time)
 
 		for message := range nfMessages {
-			serialNumber, obsID, err := nfDecoder.Decode(message.IP, message.Data)
+			sensor, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
 				logrus.Errorln("Error decoding netflow: " + err.Error())
+				continue
+			}
+
+			if sensor == nil {
 				continue
 			}
 
 			ip := make(net.IP, 4)
 			binary.BigEndian.PutUint32(ip, message.IP)
 
-			if len(serialNumber) == 0 {
-				continue
-			}
-
-			if time.Since(lastUpdated[serialNumber]) <
+			if time.Since(lastUpdated[sensor.SerialNumber]) <
 				time.Duration(config.Updater.UpdateInterval)*time.Second {
 				continue
 			}
 
-			lastUpdated[serialNumber] = time.Now()
+			lastUpdated[sensor.SerialNumber] = time.Now()
 
-			err = chefUpdater.UpdateNode(ip, serialNumber, obsID)
+			err = chefUpdater.UpdateNode(
+				ip,
+				sensor.SerialNumber,
+				sensor.ObservationID,
+				sensor.DeviceID,
+			)
 			if err != nil {
 				logrus.Warnf("Error updating node [%s | %s]: %s",
-					serialNumber, ip.String(), err.Error())
+					sensor.SerialNumber, ip.String(), err.Error())
 				continue
 			}
 
 			logrus.Infof(
 				"Updated sensor [IP: %s | SERIAL_NUMBER: %s | OBS. Domain ID: %d]",
-				ip.String(), serialNumber, obsID)
+				ip.String(), sensor.SerialNumber, sensor.ObservationID)
 		}
 
 		wg.Done()

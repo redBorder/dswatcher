@@ -18,6 +18,7 @@
 package updater
 
 import (
+	"net"
 	"testing"
 
 	"github.com/go-chef/chef"
@@ -44,14 +45,18 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 	nodes["0"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
-				"uuid": "0000",
+				"uuid":          "0000",
+				"serial_number": "888888",
+				"device_id":     224,
 			},
 		},
 	}
 	nodes["1"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org2": map[string]interface{}{
-				"uuid": "1111",
+				"uuid":          "1111",
+				"serial_number": "777777",
+				"device_id":     123,
 			},
 		},
 	}
@@ -205,4 +210,55 @@ func TestResetSensors(t *testing.T) {
 
 	assert.False(t, attributes0["blocked"].(bool))
 	assert.False(t, attributes2["blocked"].(bool))
+}
+
+func TestUpdateNode(t *testing.T) {
+	chefUpdater := &ChefUpdater{
+		nodes: bootstrapSensorsDB(),
+		ChefUpdaterConfig: ChefUpdaterConfig{
+			AccessKey:        testPEMKey,
+			Name:             "test",
+			SensorUUIDPath:   "org/uuid",
+			DeviceIDPath:     "org/device_id",
+			SerialNumberPath: "org/serial_number",
+			IPAddressPath:    "org/ipaddress",
+		},
+	}
+
+	address := make(net.IP, 4)
+	err := chefUpdater.UpdateNode(address, "888888", 10, 224)
+	assert.NoError(t, err)
+
+	attrs, err := getParent(chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.SensorUUIDPath)
+	assert.NoError(t, err)
+
+	ip, ok := attrs["ipaddress"].(string)
+	assert.True(t, ok)
+	assert.Equal(t, address.String(), ip)
+}
+
+func TestUpdateNodeError(t *testing.T) {
+	chefUpdater := &ChefUpdater{
+		nodes: bootstrapSensorsDB(),
+		ChefUpdaterConfig: ChefUpdaterConfig{
+			AccessKey:        testPEMKey,
+			Name:             "test",
+			SensorUUIDPath:   "org2/uuid",
+			DeviceIDPath:     "org2/device_id",
+			SerialNumberPath: "org2/serial_number",
+			IPAddressPath:    "org2/ipaddress",
+		},
+	}
+
+	address := make(net.IP, 4)
+	err := chefUpdater.UpdateNode(address, "777777", 10, 224)
+	assert.Error(t, err)
+
+	attrs, err := getParent(chefUpdater.nodes["1"].NormalAttributes,
+		chefUpdater.SensorUUIDPath)
+	assert.NoError(t, err)
+
+	_, ok := attrs["ipaddress"].(string)
+	assert.False(t, ok)
 }

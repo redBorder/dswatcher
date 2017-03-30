@@ -33,8 +33,9 @@ type DynamicSensorsWatcherConfig struct {
 	}
 
 	Decoder struct {
-		ElementID        int `yaml:"element_id"`
-		OptionTemplateID int `yaml:"option_template_id"`
+		ElementID           int `yaml:"element_id"`
+		DeviceTypeElementID int `yaml:"device_type_element_id"`
+		OptionTemplateID    int `yaml:"option_template_id"`
 	}
 
 	Updater struct {
@@ -46,6 +47,7 @@ type DynamicSensorsWatcherConfig struct {
 		IPAddressPath     string `yaml:"ipaddress_path"`
 		SensorUUIDPath    string `yaml:"sensor_uuid_path"`
 		BlocketStatusPath string `yaml:"blocked_status_path"`
+		DeviceIDPath      string `yaml:"device_id_path"`
 		UpdateInterval    int64  `yaml:"update_interval_s"`
 		FetchInterval     int64  `yaml:"fetch_interval_s"`
 	}
