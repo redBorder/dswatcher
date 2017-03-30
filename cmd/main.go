@@ -81,6 +81,7 @@ func main() {
 
 	decoderConfig := decoder.Netflow10DecoderConfig{
 		SerialNumberElementID: uint16(config.Decoder.ElementID),
+		DeviceTypeElementID:   uint16(config.Decoder.DeviceTypeElementID),
 		OptionTemplateID:      uint16(config.Decoder.OptionTemplateID),
 	}
 	nfDecoder := decoder.NewNetflow10Decoder(decoderConfig)
@@ -103,6 +104,7 @@ func main() {
 		ObservationIDPath: config.Updater.ObservationIDPath,
 		IPAddressPath:     config.Updater.IPAddressPath,
 		BlockedStatusPath: config.Updater.BlocketStatusPath,
+		DeviceIDPath:      config.Updater.DeviceIDPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())
@@ -167,7 +169,12 @@ func main() {
 
 			lastUpdated[sensor.SerialNumber] = time.Now()
 
-			err = chefUpdater.UpdateNode(ip, sensor.SerialNumber, sensor.ObservationID)
+			err = chefUpdater.UpdateNode(
+				ip,
+				sensor.SerialNumber,
+				sensor.ObservationID,
+				sensor.DeviceID,
+			)
 			if err != nil {
 				logrus.Warnf("Error updating node [%s | %s]: %s",
 					sensor.SerialNumber, ip.String(), err.Error())
