@@ -27,8 +27,8 @@ their limits. The sensor will be marked as blocked on the Chef node. When no
 UUID is specified, i.e. `uuid == "*"` then all sensors will be blocked.
 - `dswatcher` will listen for alerts about counters resets. When this message
 is received all the sensors block status will be set to **false**.
-- `dswatcher` can check if the Device Type on the Netflow data matches the
-Device Type specified on the database (Chef Node).
+- `dswatcher` can check if the Product Type on the Netflow data matches the
+Product Type specified on the database (Chef Node).
 
 ## Installing
 
@@ -83,9 +83,9 @@ broker:
     - rb_limits        # Topic listen for notification about sensors limits
 
 decoder:
-  element_id: 300             # Netflow element id of the serial number
-  option_template_id: 258     # ID of the Option Template where the serial number is
-  device_type_element_id: 144 # Element ID of the field used to verify the DeviceID
+  element_id: 300              # Netflow element id of the serial number
+  option_template_id: 258      # ID of the Option Template where the serial number is
+  product_type_element_id: 144 # Element ID of the field used to verify the DeviceID
 
 updater:
   chef_server_url: <chef_server_url>            # URL of the Chef server
@@ -95,7 +95,7 @@ updater:
   sensor_uuid_path: org/sensor_uuid             # Path to the UUID of the sensor on Chef
   ipaddress_path: org/ipaddress                 # Path to the IP address of the sensor to update
   observation_id_path: org/observation_id       # Path to the Observation Domain ID to update
-  device_id_path: org/device_id                 # Path to the Device ID to verify
+  product_type_path: org/product_type           # Path to the Product Type to verify
   fetch_interval_s: 60                          # Time between updates of the internal sensors database
   blocked_status_path: org/blocked              # Path to the block status
   update_interval_s: 30                         # Time between updates of the Chef node
