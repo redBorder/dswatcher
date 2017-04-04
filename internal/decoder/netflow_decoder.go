@@ -38,14 +38,14 @@ type Sensor struct {
 	SerialNumber  string
 	ObservationID uint32
 	Address       net.IP
-	DeviceID      uint32
+	ProductType   uint32
 }
 type decoders map[uint32]*netflow.Decoder
 type sensors []Sensor
 
 // Netflow10DecoderConfig contains the Netflow10Decoder configuration
 type Netflow10DecoderConfig struct {
-	DeviceTypeElementID   uint16
+	ProductTypeElementID  uint16
 	SerialNumberElementID uint16
 	OptionTemplateID      uint16
 }
@@ -93,7 +93,7 @@ func (nd *Netflow10Decoder) Decode(ip uint32, data []byte) (*Sensor, error) {
 	}
 
 	if !checkOptionTemplateID(&p.OptionsTemplateSets[0], nd.OptionTemplateID,
-		nd.SerialNumberElementID, nd.DeviceTypeElementID) {
+		nd.SerialNumberElementID, nd.ProductTypeElementID) {
 		return nil, nil
 	}
 
@@ -114,7 +114,7 @@ func (nd *Netflow10Decoder) Decode(ip uint32, data []byte) (*Sensor, error) {
 
 	s := &Sensor{
 		SerialNumber:  serialNumber,
-		DeviceID:      productType,
+		ProductType:   productType,
 		ObservationID: p.Header.ObservationDomainID,
 	}
 

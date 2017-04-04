@@ -27,7 +27,7 @@ func TestDecoder(t *testing.T) {
 	Convey("Given a Netflow 10 decoder", t, func() {
 		decoder := NewNetflow10Decoder(Netflow10DecoderConfig{
 			SerialNumberElementID: 300,
-			DeviceTypeElementID:   144,
+			ProductTypeElementID:  144,
 			OptionTemplateID:      258,
 		})
 
@@ -79,7 +79,7 @@ func TestDecoder(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(sensor, ShouldNotBeNil)
 				So(sensor.SerialNumber, ShouldEqual, "tim/88888888")
-				So(sensor.DeviceID, ShouldEqual, 219)
+				So(sensor.ProductType, ShouldEqual, 219)
 				So(sensor.ObservationID, ShouldEqual, 10)
 			})
 		})
