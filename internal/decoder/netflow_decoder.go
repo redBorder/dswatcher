@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"strconv"
 
 	"github.com/tehmaze/netflow"
 	"github.com/tehmaze/netflow/ipfix"
@@ -37,14 +38,14 @@ type Sensor struct {
 	SerialNumber  string
 	ObservationID uint32
 	Address       net.IP
-	DeviceID      uint32
+	ProductType   uint32
 }
 type decoders map[uint32]*netflow.Decoder
 type sensors []Sensor
 
 // Netflow10DecoderConfig contains the Netflow10Decoder configuration
 type Netflow10DecoderConfig struct {
-	DeviceTypeElementID   uint16
+	ProductTypeElementID  uint16
 	SerialNumberElementID uint16
 	OptionTemplateID      uint16
 }
@@ -87,55 +88,67 @@ func (nd *Netflow10Decoder) Decode(ip uint32, data []byte) (*Sensor, error) {
 		return nil, errors.New("Invalid message received: Message is not NF10/IPFIX")
 	}
 
-	for _, ots := range p.OptionsTemplateSets {
-		for _, record := range ots.Records {
-			if record.TemplateID == nd.OptionTemplateID {
-				if ok := len(record.ScopeFields) == 1; ok {
-					if record.ScopeFields[0].InformationElementID == nd.SerialNumberElementID {
-						if ok := len(p.DataSets) == 1 && p.DataSets[0].Header.ID == nd.OptionTemplateID; ok {
-							n := bytes.Index(p.DataSets[0].Bytes, []byte{0})
-							s := Sensor{
-								SerialNumber:  string(p.DataSets[0].Bytes[:n]),
-								ObservationID: p.Header.ObservationDomainID,
-							}
-
-							if nd.DeviceTypeElementID != 0 {
-								s.Address = make(net.IP, 4)
-								binary.BigEndian.PutUint32(s.Address, ip)
-								nd.sensors = append(nd.sensors, s)
-								return nil, nil
-							}
-
-							return &s, nil
-						}
-					}
-				}
-			}
-		}
+	if len(p.OptionsTemplateSets) < 1 {
+		return nil, nil
 	}
 
-	if nd.DeviceTypeElementID != 0 {
-		for _, ds := range p.DataSets {
-			for _, record := range ds.Records {
-				for _, field := range record.Fields {
-					if field.Translated.InformationElementID == nd.DeviceTypeElementID {
-						for _, sensor := range nd.sensors {
-							address := make(net.IP, 4)
-							binary.BigEndian.PutUint32(address, ip)
-							if sensor.Address.Equal(address) &&
-								sensor.ObservationID == p.Header.ObservationDomainID {
-
-								sensor.DeviceID = field.Translated.Value.(uint32)
-								if sensor.SerialNumber != "" {
-									return &sensor, nil
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+	if !checkOptionTemplateID(&p.OptionsTemplateSets[0], nd.OptionTemplateID,
+		nd.SerialNumberElementID, nd.ProductTypeElementID) {
+		return nil, nil
 	}
 
-	return nil, nil
+	if len(p.DataSets) != 1 {
+		return nil, errors.New("Flow message not supported")
+	}
+
+	ds := &p.DataSets[0]
+
+	if ds.Header.ID != nd.OptionTemplateID {
+		return nil, errors.New("Data set with ID " +
+			strconv.FormatUint(uint64(ds.Header.ID), 10) +
+			" does not match the specified option template ID")
+	}
+
+	serialNumber := getSerialNumber(ds)
+	productType := getProductType(ds)
+
+	s := &Sensor{
+		SerialNumber:  serialNumber,
+		ProductType:   productType,
+		ObservationID: p.Header.ObservationDomainID,
+	}
+
+	return s, nil
+}
+
+func checkOptionTemplateID(set *ipfix.OptionsTemplateSet, otID, snID, ptID uint16) bool {
+	record := set.Records[0]
+
+	if len(record.ScopeFields) != 1 || len(record.Fields) != 1 {
+		return false
+	}
+
+	if record.TemplateID != otID {
+		return false
+	}
+
+	productType := record.ScopeFields[0]
+	serialNumberField := record.Fields[0]
+
+	if productType.InformationElementID != ptID ||
+		serialNumberField.InformationElementID != snID {
+		return false
+	}
+
+	return true
+}
+
+func getProductType(set *ipfix.DataSet) uint32 {
+	pt := set.Bytes[:4]
+	return binary.BigEndian.Uint32(pt)
+}
+
+func getSerialNumber(set *ipfix.DataSet) string {
+	n := bytes.Index(set.Bytes[4:len(set.Bytes)], []byte{0})
+	return string(set.Bytes[4 : n+4])
 }
