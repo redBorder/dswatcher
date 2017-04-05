@@ -47,7 +47,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org": map[string]interface{}{
 				"uuid":          "0000",
 				"serial_number": "888888",
-				"device_id":     224,
+				"device_id":     "224",
 			},
 		},
 	}
@@ -56,7 +56,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org2": map[string]interface{}{
 				"uuid":          "1111",
 				"serial_number": "777777",
-				"device_id":     123,
+				"device_id":     "123",
 			},
 		},
 	}
@@ -219,7 +219,7 @@ func TestUpdateNode(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org/uuid",
-			DeviceIDPath:     "org/device_id",
+			ProductTypePath:  "org/device_id",
 			SerialNumberPath: "org/serial_number",
 			IPAddressPath:    "org/ipaddress",
 		},
@@ -245,7 +245,7 @@ func TestUpdateNodeError(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org2/uuid",
-			DeviceIDPath:     "org2/device_id",
+			ProductTypePath:  "org2/device_id",
 			SerialNumberPath: "org2/serial_number",
 			IPAddressPath:    "org2/ipaddress",
 		},

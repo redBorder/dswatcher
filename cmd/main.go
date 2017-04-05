@@ -104,7 +104,7 @@ func main() {
 		ObservationIDPath: config.Updater.ObservationIDPath,
 		IPAddressPath:     config.Updater.IPAddressPath,
 		BlockedStatusPath: config.Updater.BlockedStatusPath,
-		DeviceIDPath:      config.Updater.ProductTypePath,
+		ProductTypePath:   config.Updater.ProductTypePath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())

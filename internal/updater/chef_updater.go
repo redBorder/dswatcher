@@ -47,7 +47,7 @@ type ChefUpdaterConfig struct {
 	ObservationIDPath string
 	IPAddressPath     string
 	BlockedStatusPath string
-	DeviceIDPath      string
+	ProductTypePath   string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -113,12 +113,13 @@ func (cu *ChefUpdater) FetchNodes() error {
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(
 	address net.IP, serialNumber string, obsID uint32, deviceID uint32) error {
-	deviceIDKey := getKeyFromPath(cu.DeviceIDPath)
+	deviceIDKey := getKeyFromPath(cu.ProductTypePath)
 
 	var (
-		ok               bool
-		nodeDeviceID     interface{}
-		nodeDeviceIDUint int
+		ok                 bool
+		nodeProductType    interface{}
+		nodeProductTypeStr string
+		nodeProductTypeInt uint64
 	)
 
 	node := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
@@ -126,21 +127,26 @@ func (cu *ChefUpdater) UpdateNode(
 		return errors.New("Node not found")
 	}
 
-	deviceIDAttributes, err := getParent(node.NormalAttributes, cu.DeviceIDPath)
+	deviceIDAttributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
 	if err != nil {
 		return err
 	}
 
-	if nodeDeviceID, ok = deviceIDAttributes[deviceIDKey]; !ok {
-		return errors.New("Sensor " + serialNumber + " does not have a DeviceID")
+	if nodeProductType, ok = deviceIDAttributes[deviceIDKey]; !ok {
+		return errors.New("Sensor " + serialNumber + " does not have a Product Type")
 	}
 
-	if nodeDeviceIDUint, ok = nodeDeviceID.(int); !ok {
-		return errors.New("DeviceID is not integer")
+	if nodeProductTypeStr, ok = nodeProductType.(string); !ok {
+		return errors.New("Product Type is not string")
 	}
 
-	if nodeDeviceIDUint != int(deviceID) {
-		return errors.New("DeviceID for " + address.String() + " does not match")
+	nodeProductTypeInt, err = strconv.ParseUint(nodeProductTypeStr, 10, 32)
+	if err != nil {
+		return err
+	}
+
+	if uint32(nodeProductTypeInt) != deviceID {
+		return errors.New("Product Type for " + address.String() + " does not match")
 	}
 
 	ipaddressAttributes, err := getParent(node.NormalAttributes, cu.IPAddressPath)
