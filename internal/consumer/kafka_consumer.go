@@ -133,7 +133,12 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 	go func() {
 		for m := range inputMessages {
 			var data limitMessage
-			json.Unmarshal(m.Value, &data)
+			err := json.Unmarshal(m.Value, &data)
+
+			if err != nil {
+				info <- err.Error()
+				continue
+			}
 
 			switch data.Type {
 			case "limit_reached":
