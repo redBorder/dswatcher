@@ -39,15 +39,16 @@ type ChefAPIClient interface {
 type ChefUpdaterConfig struct {
 	client *chef.Client
 
-	Name              string
-	URL               string
-	AccessKey         string
-	SerialNumberPath  string
-	SensorUUIDPath    string
-	ObservationIDPath string
-	IPAddressPath     string
-	BlockedStatusPath string
-	ProductTypePath   string
+	Name                 string
+	URL                  string
+	AccessKey            string
+	SerialNumberPath     string
+	SensorUUIDPath       string
+	ObservationIDPath    string
+	IPAddressPath        string
+	BlockedStatusPath    string
+	ProductTypePath      string
+	OrganizationUUIDPath string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -225,8 +226,9 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 	return true, nil
 }
 
-// ResetSensors sets the blocked status to false for every sensor.
-func (cu *ChefUpdater) ResetSensors() error {
+// ResetSensors sets the blocked status to false for sensors belonging to an
+// organization
+func (cu *ChefUpdater) ResetSensors(organization string) error {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
 	for _, node := range cu.nodes {
@@ -235,7 +237,10 @@ func (cu *ChefUpdater) ResetSensors() error {
 			continue
 		}
 
-		attributes[key] = false
+		if attributes[cu.OrganizationUUIDPath] == organization ||
+			organization == "*" {
+			attributes[key] = false
+		}
 
 		if cu.client != nil {
 			cu.client.Nodes.Put(*node)

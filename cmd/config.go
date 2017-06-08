@@ -39,17 +39,18 @@ type DynamicSensorsWatcherConfig struct {
 	}
 
 	Updater struct {
-		URL               string `yaml:"chef_server_url"`
-		Key               string `yaml:"client_key"`
-		NodeName          string `yaml:"node_name"`
-		SerialNumberPath  string `yaml:"serial_number_path"`
-		ObservationIDPath string `yaml:"observation_id_path"`
-		IPAddressPath     string `yaml:"ipaddress_path"`
-		SensorUUIDPath    string `yaml:"sensor_uuid_path"`
-		BlockedStatusPath string `yaml:"blocked_status_path"`
-		ProductTypePath   string `yaml:"product_type_path"`
-		UpdateInterval    int64  `yaml:"update_interval_s"`
-		FetchInterval     int64  `yaml:"fetch_interval_s"`
+		URL                  string `yaml:"chef_server_url"`
+		Key                  string `yaml:"client_key"`
+		NodeName             string `yaml:"node_name"`
+		SerialNumberPath     string `yaml:"serial_number_path"`
+		ObservationIDPath    string `yaml:"observation_id_path"`
+		IPAddressPath        string `yaml:"ipaddress_path"`
+		SensorUUIDPath       string `yaml:"sensor_uuid_path"`
+		BlockedStatusPath    string `yaml:"blocked_status_path"`
+		ProductTypePath      string `yaml:"product_type_path"`
+		OrganizationUUIDPath string `yaml:"organization_uuid"`
+		UpdateInterval       int64  `yaml:"update_interval_s"`
+		FetchInterval        int64  `yaml:"fetch_interval_s"`
 	}
 }
 

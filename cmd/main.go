@@ -96,15 +96,16 @@ func main() {
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:               config.Updater.URL,
-		AccessKey:         string(key),
-		Name:              config.Updater.NodeName,
-		SerialNumberPath:  config.Updater.SerialNumberPath,
-		SensorUUIDPath:    config.Updater.SensorUUIDPath,
-		ObservationIDPath: config.Updater.ObservationIDPath,
-		IPAddressPath:     config.Updater.IPAddressPath,
-		BlockedStatusPath: config.Updater.BlockedStatusPath,
-		ProductTypePath:   config.Updater.ProductTypePath,
+		URL:                  config.Updater.URL,
+		AccessKey:            string(key),
+		Name:                 config.Updater.NodeName,
+		SerialNumberPath:     config.Updater.SerialNumberPath,
+		SensorUUIDPath:       config.Updater.SensorUUIDPath,
+		ObservationIDPath:    config.Updater.ObservationIDPath,
+		IPAddressPath:        config.Updater.IPAddressPath,
+		BlockedStatusPath:    config.Updater.BlockedStatusPath,
+		ProductTypePath:      config.Updater.ProductTypePath,
+		OrganizationUUIDPath: config.Updater.OrganizationUUIDPath,
 	})
 	if err != nil {
 		logrus.Fatal("Error creating Chef API client: " + err.Error())
@@ -256,7 +257,7 @@ func main() {
 					}
 
 				case consumer.ResetSignal:
-					err := chefUpdater.ResetSensors()
+					err := chefUpdater.ResetSensors(m.Organization)
 					if err != nil {
 						logrus.Errorf("Error resetting sensors: %s", err.Error())
 						continue receiving

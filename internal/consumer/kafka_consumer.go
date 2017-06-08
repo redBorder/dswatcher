@@ -140,7 +140,9 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 				messages <- UUID(data.UUID)
 
 			case "counters_reset":
-				messages <- ResetSignal{}
+				messages <- ResetSignal{
+					data.UUID,
+				}
 
 			default:
 				info <- "Unknown alert received"
