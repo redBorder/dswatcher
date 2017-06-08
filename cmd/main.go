@@ -283,7 +283,7 @@ func main() {
 					}
 
 					log.Infof(
-						"Sensors for organization '%s' has been resetted\n", m.Organization,
+						"Sensors for organization '%s' has been resetted", m.Organization,
 					)
 
 				default:
@@ -298,7 +298,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for event := range limitsEvents {
-			log.Warnln(event)
+			log.Debugln(event)
 		}
 
 		wg.Done()
