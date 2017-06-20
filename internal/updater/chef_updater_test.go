@@ -45,9 +45,10 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 	nodes["0"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
-				"uuid":          "0000",
-				"serial_number": "888888",
-				"device_id":     224,
+				"uuid":              "0000",
+				"serial_number":     "888888",
+				"device_id":         "224",
+				"organization_uuid": "abcde",
 			},
 		},
 	}
@@ -56,14 +57,16 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org2": map[string]interface{}{
 				"uuid":          "1111",
 				"serial_number": "777777",
-				"device_id":     123,
+				"device_id":     "123",
 			},
 		},
 	}
 
 	nodes["2"] = &chef.Node{
 		NormalAttributes: map[string]interface{}{
-			"org": map[string]interface{}{},
+			"org": map[string]interface{}{
+				"organization_uuid": "fghij",
+			},
 		},
 	}
 
@@ -187,10 +190,11 @@ func TestResetSensors(t *testing.T) {
 	chefUpdater := &ChefUpdater{
 		nodes: bootstrapSensorsDB(),
 		ChefUpdaterConfig: ChefUpdaterConfig{
-			AccessKey:         testPEMKey,
-			Name:              "test",
-			SensorUUIDPath:    "org/uuid",
-			BlockedStatusPath: "org/blocked",
+			AccessKey:            testPEMKey,
+			Name:                 "test",
+			SensorUUIDPath:       "org/uuid",
+			BlockedStatusPath:    "org/blocked",
+			OrganizationUUIDPath: "organization_uuid",
 		},
 	}
 
@@ -206,10 +210,10 @@ func TestResetSensors(t *testing.T) {
 	attributes0["blocked"] = true
 	attributes2["blocked"] = true
 
-	chefUpdater.ResetSensors()
+	chefUpdater.ResetSensors("abcde")
 
 	assert.False(t, attributes0["blocked"].(bool))
-	assert.False(t, attributes2["blocked"].(bool))
+	assert.True(t, attributes2["blocked"].(bool))
 }
 
 func TestUpdateNode(t *testing.T) {
@@ -219,7 +223,7 @@ func TestUpdateNode(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org/uuid",
-			DeviceIDPath:     "org/device_id",
+			ProductTypePath:  "org/device_id",
 			SerialNumberPath: "org/serial_number",
 			IPAddressPath:    "org/ipaddress",
 		},
@@ -245,7 +249,7 @@ func TestUpdateNodeError(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org2/uuid",
-			DeviceIDPath:     "org2/device_id",
+			ProductTypePath:  "org2/device_id",
 			SerialNumberPath: "org2/serial_number",
 			IPAddressPath:    "org2/ipaddress",
 		},

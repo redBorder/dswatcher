@@ -30,12 +30,21 @@ import (
 	"github.com/redBorder/dswatcher/internal/consumer"
 	"github.com/redBorder/dswatcher/internal/decoder"
 	"github.com/redBorder/dswatcher/internal/updater"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
-var version string
-var configFile string
+var (
+	version    string
+	configFile string
+	log        = logrus.New()
+)
 
 func init() {
+	log.Formatter = &prefixed.TextFormatter{
+		ForceColors:      true,
+		DisableTimestamp: true,
+	}
+
 	versionFlag := flag.Bool("version", false, "Show version info")
 	debugFlag := flag.Bool("debug", false, "Show debug info")
 	configFlag := flag.String("config", "", "Application configuration file")
@@ -52,7 +61,7 @@ func init() {
 	}
 
 	if *debugFlag {
-		logrus.SetLevel(logrus.DebugLevel)
+		log.Level = logrus.DebugLevel
 	}
 
 	configFile = *configFlag
@@ -67,12 +76,12 @@ func main() {
 
 	rawConfig, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		logrus.Fatal("Error opening configuration file: " + err.Error())
+		log.Fatal("Error opening configuration file: " + err.Error())
 	}
 
 	config, err := ParseConfig(rawConfig)
 	if err != nil {
-		logrus.Fatal("Error parsing config" + err.Error())
+		log.Fatal("Error parsing config" + err.Error())
 	}
 
 	//////////////////////
@@ -92,27 +101,28 @@ func main() {
 
 	key, err := ioutil.ReadFile(config.Updater.Key)
 	if err != nil {
-		logrus.Fatal("Error reading client Key: " + err.Error())
+		log.Fatal("Error reading client Key: " + err.Error())
 	}
 
 	chefUpdater, err := updater.NewChefUpdater(updater.ChefUpdaterConfig{
-		URL:               config.Updater.URL,
-		AccessKey:         string(key),
-		Name:              config.Updater.NodeName,
-		SerialNumberPath:  config.Updater.SerialNumberPath,
-		SensorUUIDPath:    config.Updater.SensorUUIDPath,
-		ObservationIDPath: config.Updater.ObservationIDPath,
-		IPAddressPath:     config.Updater.IPAddressPath,
-		BlockedStatusPath: config.Updater.BlockedStatusPath,
-		DeviceIDPath:      config.Updater.ProductTypePath,
+		URL:                  config.Updater.URL,
+		AccessKey:            string(key),
+		Name:                 config.Updater.NodeName,
+		SerialNumberPath:     config.Updater.SerialNumberPath,
+		SensorUUIDPath:       config.Updater.SensorUUIDPath,
+		ObservationIDPath:    config.Updater.ObservationIDPath,
+		IPAddressPath:        config.Updater.IPAddressPath,
+		BlockedStatusPath:    config.Updater.BlockedStatusPath,
+		ProductTypePath:      config.Updater.ProductTypePath,
+		OrganizationUUIDPath: config.Updater.OrganizationUUIDPath,
 	})
 	if err != nil {
-		logrus.Fatal("Error creating Chef API client: " + err.Error())
+		log.Fatal("Error creating Chef API client: " + err.Error())
 	}
 
 	err = chefUpdater.FetchNodes()
 	if err != nil {
-		logrus.Errorln("Error fetching nodes: " + err.Error())
+		log.Errorln("Error fetching nodes: " + err.Error())
 	}
 
 	fetchSignal :=
@@ -129,12 +139,12 @@ func main() {
 		config.Broker.LimitsTopics,
 	)
 	if err != nil {
-		logrus.Fatal("Error creating Kafka config: " + err.Error())
+		log.Fatal("Error creating Kafka config: " + err.Error())
 	}
 
 	kafkaConsumer, err := consumer.NewKafkaConsumer(consumerConfig)
 	if err != nil {
-		logrus.Fatal("Error creating Kafka consumer: " + err.Error())
+		log.Fatal("Error creating Kafka consumer: " + err.Error())
 	}
 	defer kafkaConsumer.Close()
 
@@ -145,13 +155,14 @@ func main() {
 	nfMessages, nfEvents := kafkaConsumer.ConsumeNetflow()
 
 	wg.Add(1)
+	log.Infoln("Listening for netflow")
 	go func() {
 		lastUpdated := make(map[string]time.Time)
 
 		for message := range nfMessages {
 			sensor, err := nfDecoder.Decode(message.IP, message.Data)
 			if err != nil {
-				logrus.Errorln("Error decoding netflow: " + err.Error())
+				log.Errorln("Error decoding netflow: " + err.Error())
 				continue
 			}
 
@@ -176,12 +187,12 @@ func main() {
 				sensor.ProductType,
 			)
 			if err != nil {
-				logrus.Warnf("Error updating node [%s | %s]: %s",
+				log.Warnf("Error updating node [%s | %s]: %s",
 					sensor.SerialNumber, ip.String(), err.Error())
 				continue
 			}
 
-			logrus.Infof(
+			log.Infof(
 				"Updated sensor [IP: %s | SERIAL_NUMBER: %s | OBS. Domain ID: %d]",
 				ip.String(), sensor.SerialNumber, sensor.ObservationID)
 		}
@@ -192,7 +203,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for event := range nfEvents {
-			logrus.Debugln(event)
+			log.Debugln(event)
 		}
 		wg.Done()
 	}()
@@ -204,6 +215,7 @@ func main() {
 	limitsMessages, limitsEvents := kafkaConsumer.ConsumeLimits()
 
 	wg.Add(1)
+	log.Infoln("Listening for limits messages")
 	go func() {
 		var lastBlocked time.Time
 
@@ -213,8 +225,11 @@ func main() {
 			case <-fetchSignal.C:
 				err = chefUpdater.FetchNodes()
 				if err != nil {
-					logrus.Errorln("Error fetching nodes: " + err.Error())
+					log.Errorln("Error fetching nodes: " + err.Error())
+					continue
 				}
+
+				log.Debugln("Sensors DB updated")
 
 			case message, ok := <-limitsMessages:
 				if !ok {
@@ -235,34 +250,44 @@ func main() {
 						errs := chefUpdater.BlockAllSensors()
 
 						if len(errs) == 0 {
-							logrus.Infoln("Blocked all sensors")
+							log.Infoln("Blocked all sensors")
 						} else {
-							logrus.Warnf("Not all sensors could be blocked")
+							log.Warnf("Not all sensors could be blocked")
 						}
 
 						for _, err := range errs {
-							logrus.Warnf("Error blocking sensor: %s", err.Error())
+							log.Warnf("Error blocking sensor: %s", err.Error())
 						}
 					} else {
 						blocked, err := chefUpdater.BlockSensor(uuid)
 						if err != nil {
-							logrus.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
+							log.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
 							continue receiving
 						}
 
 						if blocked {
-							logrus.Infoln("Blocked UUID: " + uuid)
+							log.Infoln("Blocked UUID: " + uuid)
 						}
 					}
 
 				case consumer.ResetSignal:
-					err := chefUpdater.ResetSensors()
-					if err != nil {
-						logrus.Errorf("Error resetting sensors: %s", err.Error())
+					if m.Organization == "" {
+						log.Warnf("Received reset signal without uuid")
 						continue receiving
 					}
 
-					logrus.Infoln("All sensors have been reset")
+					err := chefUpdater.ResetSensors(m.Organization)
+					if err != nil {
+						log.Errorf("Error resetting sensors: %s", err.Error())
+						continue receiving
+					}
+
+					log.Infof(
+						"Sensors for organization '%s' has been resetted", m.Organization,
+					)
+
+				default:
+					log.Warnln("Unknown message received")
 				}
 			}
 		}
@@ -273,7 +298,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		for event := range limitsEvents {
-			logrus.Debugln(event)
+			log.Debugln(event)
 		}
 
 		wg.Done()
@@ -284,5 +309,5 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////
 
 	wg.Wait()
-	logrus.Infoln("Bye bye...")
+	log.Infoln("Bye bye...")
 }
