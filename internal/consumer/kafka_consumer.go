@@ -30,7 +30,7 @@ type limitMessage struct {
 	Type         string `yaml:"type"`
 	UUID         string `yaml:"uuid"`
 	CurrentBytes string `yaml:"current_bytes"`
-	Limit        string `yaml:"limit"`
+	Limit        int64  `yaml:"limit"`
 	Timestamp    int64  `yaml:"timestamp"`
 }
 
@@ -133,14 +133,22 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 	go func() {
 		for m := range inputMessages {
 			var data limitMessage
-			json.Unmarshal(m.Value, &data)
+			err := json.Unmarshal(m.Value, &data)
+
+			// TODO this should be logged as an error
+			if err != nil {
+				info <- err.Error()
+				continue
+			}
 
 			switch data.Type {
 			case "limit_reached":
 				messages <- UUID(data.UUID)
 
 			case "counters_reset":
-				messages <- ResetSignal{}
+				messages <- ResetSignal{
+					data.UUID,
+				}
 
 			default:
 				info <- "Unknown alert received"

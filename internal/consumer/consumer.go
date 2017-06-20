@@ -23,8 +23,11 @@ type Message interface{}
 // UUID identifies the sensor that reached the limit
 type UUID string
 
-// ResetSignal notifies that all sensors should be unblocked.
-type ResetSignal struct{}
+// ResetSignal notifies that sensors from a given organization should be
+// unblocked.
+type ResetSignal struct {
+	Organization string
+}
 
 // FlowData contains the IP address of the Netflow exporter and the flow itself
 type FlowData struct {

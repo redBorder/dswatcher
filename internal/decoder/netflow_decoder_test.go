@@ -26,8 +26,9 @@ import (
 func TestDecoder(t *testing.T) {
 	Convey("Given a Netflow 10 decoder", t, func() {
 		decoder := NewNetflow10Decoder(Netflow10DecoderConfig{
-			ElementID:        300,
-			OptionTemplateID: 258,
+			SerialNumberElementID: 300,
+			ProductTypeElementID:  144,
+			OptionTemplateID:      258,
 		})
 
 		Convey("For valid template and data sets", func() {
@@ -36,7 +37,7 @@ func TestDecoder(t *testing.T) {
 				// Headers //
 				/////////////
 				0x00, 0x0a, // Version: 10
-				0x00, 0x64, // Length: 100
+				0x00, 0x6c, // Length: 108
 				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
 				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
 				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
@@ -45,19 +46,22 @@ func TestDecoder(t *testing.T) {
 				// Set 1 [id=3] (Options Template): 258 //
 				//////////////////////////////////////////
 				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
-				0x00, 0x0e, // FlowSet Length: 14
-				// Options Template (Id = 258) (Scope Count = 1; Data Count = 0)
+				0x00, 0x12, // FlowSet Length: 18
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
 				0x01, 0x02, // Template Id: 258
-				0x00, 0x01, // Total Field Count: 1
+				0x00, 0x02, // Total Field Count: 2
 				0x00, 0x01, // Scope Field Count: 1
-				0x01, 0x2c, 0x00, 0x40, // Field (1/1) [Scope]: observationDomainName
+				0x00, 0x90, 0x00, 0x04, // Field (1/1) [Scope]: FLOW_EXPORTER
+				0x01, 0x2c, 0x00, 0x40, // Field (1/1): observationDomainName
 
 				//////////////////////////////
 				// Set 2 [id=258] (1 flows) //
 				//////////////////////////////
 				0x01, 0x02, // FlowSet Id: (Data) (258)
-				0x00, 0x46, // FlowSet Length: 70
-				// Flow 1: Serial number "tim/88888888"
+				0x00, 0x4a, // FlowSet Length: 74
+				// Flow 1
+				0x00, 0x00, 0x00, 0xdb, // FlowExporter: 219
+				// Serial number "tim/88888888"
 				0x74, 0x69, 0x6d, 0x2f, 0x38, 0x38, 0x38, 0x38,
 				0x38, 0x38, 0x38, 0x38, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -71,12 +75,16 @@ func TestDecoder(t *testing.T) {
 			}
 
 			Convey("The serial number and observation domain ID should be decoded", func() {
-				sn, obsID, err := decoder.Decode(3232235777, data) // 192.168.1.1
+				sensor, err := decoder.Decode(3232235777, data) // 192.168.1.1
 				So(err, ShouldBeNil)
-				So(sn, ShouldEqual, "tim/88888888")
-				So(obsID, ShouldEqual, 10)
+				So(sensor, ShouldNotBeNil)
+				So(sensor.SerialNumber, ShouldEqual, "tim/88888888")
+				So(sensor.ProductType, ShouldEqual, 219)
+				So(sensor.ObservationID, ShouldEqual, 10)
 			})
 		})
+
+		////////////////////////////////////////////////////////////////////////////
 
 		Convey("For valid template and data sets with different option template id", func() {
 			data := []byte{
@@ -84,7 +92,7 @@ func TestDecoder(t *testing.T) {
 				// Headers //
 				/////////////
 				0x00, 0x0a, // Version: 10
-				0x00, 0x64, // Length: 100
+				0x00, 0x6c, // Length: 108
 				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
 				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
 				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
@@ -93,19 +101,22 @@ func TestDecoder(t *testing.T) {
 				// Set 1 [id=3] (Options Template): 258 //
 				//////////////////////////////////////////
 				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
-				0x00, 0x0e, // FlowSet Length: 14
-				// Options Template (Id = 258) (Scope Count = 1; Data Count = 0)
+				0x00, 0x12, // FlowSet Length: 18
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
 				0x01, 0x02, // Template Id: 258
-				0x00, 0x01, // Total Field Count: 1
+				0x00, 0x02, // Total Field Count: 2
 				0x00, 0x01, // Scope Field Count: 1
-				0x01, 0x2c, 0x00, 0x40, // Field (1/1) [Scope]: observationDomainName
+				0x00, 0x90, 0x00, 0x04, // Field (1/1) [Scope]: FLOW_EXPORTER
+				0x01, 0x2c, 0x00, 0x40, // Field (1/1): observationDomainName
 
 				//////////////////////////////
-				// Set 2 [id=257] (1 flows) //
+				// Set 2 [id=258] (1 flows) //
 				//////////////////////////////
-				0x01, 0x00, // FlowSet Id: (Data) (257)
-				0x00, 0x46, // FlowSet Length: 70
-				// Flow 1: Serial number "tim/88888888"
+				0x01, 0x03, // FlowSet Id: (Data) (259)
+				0x00, 0x4a, // FlowSet Length: 74
+				// Flow 1
+				0x00, 0x00, 0x00, 0xdb, // FlowExporter: 219
+				// Serial number "tim/88888888"
 				0x74, 0x69, 0x6d, 0x2f, 0x38, 0x38, 0x38, 0x38,
 				0x38, 0x38, 0x38, 0x38, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -119,12 +130,15 @@ func TestDecoder(t *testing.T) {
 			}
 
 			Convey("The serial number and observation domain ID should NOT be decoded", func() {
-				sn, obsID, err := decoder.Decode(3232235777, data) // 192.168.1.1
-				So(err, ShouldBeNil)
-				So(sn, ShouldEqual, "")
-				So(obsID, ShouldEqual, 10)
+				sensor, err := decoder.Decode(3232235777, data) // 192.168.1.1
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldEqual,
+					"Data set with ID 259 does not match the specified option template ID")
+				So(sensor, ShouldBeNil)
 			})
 		})
+
+		////////////////////////////////////////////////////////////////////////////
 
 		Convey("For valid template and data sets without serial number", func() {
 			data := []byte{
@@ -132,7 +146,41 @@ func TestDecoder(t *testing.T) {
 				// Headers //
 				/////////////
 				0x00, 0x0a, // Version: 10
-				0x00, 0x1e, // Length: 100
+				0x00, 0x22, // Length: 34
+				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
+				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
+				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
+
+				//////////////////////////////////////////
+				// Set 1 [id=3] (Options Template): 258 //
+				//////////////////////////////////////////
+				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
+				0x00, 0x12, // FlowSet Length: 18
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
+				0x01, 0x02, // Template Id: 258
+				0x00, 0x02, // Total Field Count: 2
+				0x00, 0x01, // Scope Field Count: 1
+				0x00, 0x90, 0x00, 0x04, // Field (1/1) [Scope]: FLOW_EXPORTER
+				0x01, 0x2c, 0x00, 0x40, // Field (1/1): observationDomainName
+			}
+
+			Convey("The retuned serial number should be empty", func() {
+				sensor, err := decoder.Decode(3232235777, data)
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldEqual, "Flow message not supported")
+				So(sensor, ShouldBeNil)
+			})
+		})
+
+		////////////////////////////////////////////////////////////////////////////
+
+		Convey("For a template that does not contains the required format", func() {
+			data := []byte{
+				/////////////
+				// Headers //
+				/////////////
+				0x00, 0x0a, // Version: 10
+				0x00, 0x1e, // Length: 34
 				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
 				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
 				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
@@ -142,18 +190,133 @@ func TestDecoder(t *testing.T) {
 				//////////////////////////////////////////
 				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
 				0x00, 0x0e, // FlowSet Length: 14
-				// Options Template (Id = 258) (Scope Count = 1; Data Count = 0)
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
 				0x01, 0x02, // Template Id: 258
 				0x00, 0x01, // Total Field Count: 1
 				0x00, 0x01, // Scope Field Count: 1
-				0x01, 0x2c, 0x00, 0x40, // Field (1/1) [Scope]: observationDomainName
+				0x01, 0x2c, 0x00, 0x40, // Field (1/1): observationDomainName
 			}
 
-			Convey("The retuned serial number should be empty", func() {
-				id, obsID, err := decoder.Decode(3232235777, data)
+			Convey("Should return nil", func() {
+				sensor, err := decoder.Decode(3232235777, data)
 				So(err, ShouldBeNil)
-				So(id, ShouldEqual, "")
-				So(obsID, ShouldEqual, 10)
+				So(sensor, ShouldBeNil)
+			})
+		})
+
+		////////////////////////////////////////////////////////////////////////////
+
+		Convey("For a template with another ID", func() {
+			data := []byte{
+				/////////////
+				// Headers //
+				/////////////
+				0x00, 0x0a, // Version: 10
+				0x00, 0x22, // Length: 34
+				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
+				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
+				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
+
+				//////////////////////////////////////////
+				// Set 1 [id=3] (Options Template): 259 //
+				//////////////////////////////////////////
+				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
+				0x00, 0x12, // FlowSet Length: 18
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
+				0x01, 0x03, // Template Id: 259
+				0x00, 0x02, // Total Field Count: 2
+				0x00, 0x01, // Scope Field Count: 1
+				0x00, 0x90, 0x00, 0x04, // Field (1/1) [Scope]: FLOW_EXPORTER
+				0x01, 0x2c, 0x00, 0x40, // Field (1/1): observationDomainName
+			}
+
+			Convey("Should return nil", func() {
+				sensor, err := decoder.Decode(3232235777, data)
+				So(err, ShouldBeNil)
+				So(sensor, ShouldBeNil)
+			})
+		})
+
+		////////////////////////////////////////////////////////////////////////////
+
+		Convey("For a template with different ElementsIDs", func() {
+			data := []byte{
+				/////////////
+				// Headers //
+				/////////////
+				0x00, 0x0a, // Version: 10
+				0x00, 0x6c, // Length: 108
+				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
+				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
+				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
+
+				//////////////////////////////////////////
+				// Set 1 [id=3] (Options Template): 258 //
+				//////////////////////////////////////////
+				0x00, 0x03, // FlowSet Id: Options Template (V10 [IPFIX]) (3)
+				0x00, 0x12, // FlowSet Length: 18
+				// Options Template (Id = 258) (Scope Count = 1; Data Count = 1)
+				0x01, 0x02, // Template Id: 258
+				0x00, 0x02, // Total Field Count: 2
+				0x00, 0x01, // Scope Field Count: 1
+				0x00, 0x8f, 0x00, 0x04, // Field (1/1) [Scope]: FLOW_EXPORTER
+				0x01, 0x2e, 0x00, 0x40, // Field (1/1): observationDomainName
+
+				//////////////////////////////
+				// Set 2 [id=258] (1 flows) //
+				//////////////////////////////
+				0x01, 0x02, // FlowSet Id: (Data) (258)
+				0x00, 0x4a, // FlowSet Length: 74
+				// Flow 1
+				0x00, 0x00, 0x00, 0xdb, // FlowExporter: 219
+				// Serial number "tim/88888888"
+				0x74, 0x69, 0x6d, 0x2f, 0x38, 0x38, 0x38, 0x38,
+				0x38, 0x38, 0x38, 0x38, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				// Padding
+				0x00, 0x00,
+			}
+
+			Convey("Should return nil", func() {
+				sensor, err := decoder.Decode(3232235777, data)
+				So(err, ShouldBeNil)
+				So(sensor, ShouldBeNil)
+			})
+		})
+
+		////////////////////////////////////////////////////////////////////////////
+
+		Convey("For a flow without an option template", func() {
+			data := []byte{
+				/////////////
+				// Headers //
+				/////////////
+				0x00, 0x0a, // Version: 10
+				0x00, 0x1a, // Length: 108
+				0x58, 0xb0, 0x00, 0x49, // ExportTime: 1487929417
+				0x00, 0x00, 0xc6, 0x5b, // FlowSequence: 50779
+				0x00, 0x00, 0x00, 0x0a, // Observation Domain Id: 10
+
+				//////////////////////////////
+				// Set 1 [id=258] (1 flows) //
+				//////////////////////////////
+				0x01, 0x02, // FlowSet Id: (Data) (258)
+				0x00, 0x0a, // FlowSet Length: 10
+				// Flow 1
+				0x00, 0x00, 0x00, 0xdb, // FlowExporter: 219
+				// Padding
+				0x00, 0x00,
+			}
+
+			Convey("Should return nil", func() {
+				sensor, err := decoder.Decode(3232235777, data)
+				So(err, ShouldBeNil)
+				So(sensor, ShouldBeNil)
 			})
 		})
 
@@ -200,7 +363,7 @@ func TestDecoder(t *testing.T) {
 			}
 
 			Convey("Should error", func() {
-				_, _, err := decoder.Decode(3232235777, data)
+				_, err := decoder.Decode(3232235777, data)
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldEqual, "Invalid message received: Message is not NF10/IPFIX")
 			})
@@ -210,7 +373,7 @@ func TestDecoder(t *testing.T) {
 			data := []byte{0xca, 0xfe, 0xfa, 0xba, 0xda}
 
 			Convey("Should error", func() {
-				_, _, err := decoder.Decode(3232235777, data)
+				_, err := decoder.Decode(3232235777, data)
 				So(err, ShouldNotBeNil)
 				So(err.Error(), ShouldEqual, "Error decoding packet: netflow: unsupported version 51966")
 			})

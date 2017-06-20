@@ -19,7 +19,10 @@ package decoder
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"net"
+	"strconv"
 
 	"github.com/tehmaze/netflow"
 	"github.com/tehmaze/netflow/ipfix"
@@ -30,19 +33,29 @@ import (
 // Netflow10Decoder //
 //////////////////////
 
+// Sensor struct contains information about a sensor that has been detected
+type Sensor struct {
+	SerialNumber  string
+	ObservationID uint32
+	Address       net.IP
+	ProductType   uint32
+}
 type decoders map[uint32]*netflow.Decoder
+type sensors []Sensor
 
 // Netflow10DecoderConfig contains the Netflow10Decoder configuration
 type Netflow10DecoderConfig struct {
-	ElementID        uint16
-	OptionTemplateID uint16
+	ProductTypeElementID  uint16
+	SerialNumberElementID uint16
+	OptionTemplateID      uint16
 }
 
 // Netflow10Decoder decode a serial number and IP address from Netflow data
 type Netflow10Decoder struct {
 	Netflow10DecoderConfig
 
-	d decoders
+	sensors  sensors
+	decoders decoders
 }
 
 // NewNetflow10Decoder creates a new instance of a NetflowDecoder
@@ -50,47 +63,92 @@ func NewNetflow10Decoder(config Netflow10DecoderConfig) *Netflow10Decoder {
 	return &Netflow10Decoder{
 		Netflow10DecoderConfig: config,
 
-		d: make(map[uint32]*netflow.Decoder),
+		decoders: make(map[uint32]*netflow.Decoder),
 	}
 }
 
 // Decode tries to decode a netflow packet. The decoder maintains a session for
 // ever IP address so devices using different IP address can reuse templates.
-// Once a NF10/IPFIX packet is decoded, Decode tries to find a device ID.
-// If no device ID has been found the returned value is zero.
-func (nd Netflow10Decoder) Decode(ip uint32, data []byte) (string, uint32, error) {
-	decoder, found := nd.d[ip]
+// Once a NF10/IPFIX packet is decoded, Decode tries to find a serial number.
+// If no serial number has been found the returned value is zero.
+func (nd *Netflow10Decoder) Decode(ip uint32, data []byte) (*Sensor, error) {
+	decoder, found := nd.decoders[ip]
 	if !found {
 		decoder = netflow.NewDecoder(session.New())
-		nd.d[ip] = decoder
+		nd.decoders[ip] = decoder
 	}
 
 	m, err := decoder.Read(bytes.NewBuffer(data))
 	if err != nil {
-		return "", 0, errors.New("Error decoding packet: " + err.Error())
+		return nil, errors.New("Error decoding packet: " + err.Error())
 	}
 
 	p, ok := m.(*ipfix.Message)
 	if !ok {
-		return "", 0, errors.New("Invalid message received: Message is not NF10/IPFIX")
+		return nil, errors.New("Invalid message received: Message is not NF10/IPFIX")
 	}
 
-	for _, ots := range p.OptionsTemplateSets {
-		for _, record := range ots.Records {
-			if record.TemplateID == nd.OptionTemplateID {
-				if ok := len(record.ScopeFields) == 1; ok {
-					if record.ScopeFields[0].InformationElementID == nd.ElementID {
-						if ok := len(p.DataSets) == 1 && p.DataSets[0].Header.ID == nd.OptionTemplateID; ok {
-							n := bytes.Index(p.DataSets[0].Bytes, []byte{0})
-							serialNumer := string(p.DataSets[0].Bytes[:n])
-
-							return serialNumer, p.Header.ObservationDomainID, nil
-						}
-					}
-				}
-			}
-		}
+	if len(p.OptionsTemplateSets) < 1 {
+		return nil, nil
 	}
 
-	return "", p.Header.ObservationDomainID, nil
+	if !checkOptionTemplateID(&p.OptionsTemplateSets[0], nd.OptionTemplateID,
+		nd.SerialNumberElementID, nd.ProductTypeElementID) {
+		return nil, nil
+	}
+
+	if len(p.DataSets) != 1 {
+		return nil, errors.New("Flow message not supported")
+	}
+
+	ds := &p.DataSets[0]
+
+	if ds.Header.ID != nd.OptionTemplateID {
+		return nil, errors.New("Data set with ID " +
+			strconv.FormatUint(uint64(ds.Header.ID), 10) +
+			" does not match the specified option template ID")
+	}
+
+	serialNumber := getSerialNumber(ds)
+	productType := getProductType(ds)
+
+	s := &Sensor{
+		SerialNumber:  serialNumber,
+		ProductType:   productType,
+		ObservationID: p.Header.ObservationDomainID,
+	}
+
+	return s, nil
+}
+
+func checkOptionTemplateID(set *ipfix.OptionsTemplateSet, otID, snID, ptID uint16) bool {
+	record := set.Records[0]
+
+	if len(record.ScopeFields) != 1 || len(record.Fields) != 1 {
+		return false
+	}
+
+	if record.TemplateID != otID {
+		return false
+	}
+
+	productType := record.ScopeFields[0]
+	serialNumberField := record.Fields[0]
+
+	if productType.InformationElementID != ptID ||
+		serialNumberField.InformationElementID != snID {
+		return false
+	}
+
+	return true
+}
+
+func getProductType(set *ipfix.DataSet) uint32 {
+	pt := set.Bytes[:4]
+	return binary.BigEndian.Uint32(pt)
+}
+
+func getSerialNumber(set *ipfix.DataSet) string {
+	n := bytes.Index(set.Bytes[4:len(set.Bytes)], []byte{0})
+	return string(set.Bytes[4 : n+4])
 }

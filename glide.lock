@@ -1,14 +1,20 @@
-hash: dc160e17c4e94774542958c69c777385562c49d16da58e19e1128a910f1ab4dc
-updated: 2017-03-16T10:43:19.138000078+01:00
+hash: 7230597fb4938d1cbe462267c861686474a78815e5082db055bb543500bd67b6
+updated: 2017-06-08T13:58:17.803604916+02:00
 imports:
 - name: github.com/confluentinc/confluent-kafka-go
   version: a9b5c269c66e9a2eb5f195563b2f01e65a84c527
   subpackages:
   - kafka
 - name: github.com/go-chef/chef
-  version: a27a34ded3f4ab05bc5c4def0f61eb10272cc246
+  version: 50919d3ea541dd51b25745926db9c40dbe323bb5
+- name: github.com/mattn/go-colorable
+  version: ded68f7a9561c023e790de24279db7ebf473ea80
+- name: github.com/mattn/go-isatty
+  version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
+- name: github.com/mgutz/ansi
+  version: 9520e82c474b0a04dd04f8a40959027271bab992
 - name: github.com/Sirupsen/logrus
-  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
+  version: 68cec9f21fbf3ea8d8f98c044bc6ce05f17b267a
 - name: github.com/tehmaze/netflow
   version: 3262c0d46619ea505a794c10459d23107dd8b34a
   repo: https://github.com/Bigomby/netflow.git
@@ -22,29 +28,31 @@ imports:
   - read
   - session
   - translate
+- name: github.com/x-cray/logrus-prefixed-formatter
+  version: 9cd0cf058806896bf8ca66f9a957d36bd9e4ce0f
 - name: golang.org/x/sys
-  version: 99f16d856c9836c42d24e7ab64ea72916925fa97
+  version: b9e8d468b01f806830d387bd9a1fe96dc68129d1
   subpackages:
   - unix
 - name: gopkg.in/yaml.v2
-  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
+  version: cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b
 testImports:
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/gopherjs/gopherjs
-  version: b9bcb1da229a59cc1e1d168401662cb6450aae08
+  version: 7cde3d36aea3e1b3be7827c4dcbe6bbae73d012e
   subpackages:
   - js
 - name: github.com/jtolds/gls
-  version: bb0351aa7eb6f322f32667d51375f26a2bca6628
+  version: 77f18212c9c7edc9bd6a33d383a7b545ce62f064
 - name: github.com/pmezard/go-difflib
   version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/smartystreets/assertions
-  version: c9ee7d9e9a2aeec0bee7c4a516f3e0ad7cb7e558
+  version: 4ea54c1f28ad3ae597e76607dea3871fa177e263
   subpackages:
   - internal/go-render/render
   - internal/oglematchers

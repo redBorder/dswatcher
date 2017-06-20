@@ -20,5 +20,5 @@ package decoder
 // NetflowDecoder is an interface for a decoder that obtains a IP and Serial
 // Number from Netflow data
 type NetflowDecoder interface {
-	Decode(ip uint32, data []byte) (uint32, uint32, error)
+	Decode(ip uint32, data []byte) (*Sensor, error)
 }
