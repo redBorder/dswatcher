@@ -283,7 +283,7 @@ func main() {
 					}
 
 					log.Infof(
-						"Sensors for organization '%s' has been resetted", m.Organization,
+						"Sensors for organization '%s' has been reset", m.Organization,
 					)
 
 				default:
