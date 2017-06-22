@@ -48,7 +48,7 @@ type DynamicSensorsWatcherConfig struct {
 		SensorUUIDPath       string `yaml:"sensor_uuid_path"`
 		BlockedStatusPath    string `yaml:"blocked_status_path"`
 		ProductTypePath      string `yaml:"product_type_path"`
-		OrganizationUUIDPath string `yaml:"organization_uuid"`
+		OrganizationUUIDPath string `yaml:"organization_uuid_path"`
 		UpdateInterval       int64  `yaml:"update_interval_s"`
 		FetchInterval        int64  `yaml:"fetch_interval_s"`
 	}

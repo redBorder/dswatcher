@@ -229,7 +229,8 @@ func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
 // ResetSensors sets the blocked status to false for sensors belonging to an
 // organization
 func (cu *ChefUpdater) ResetSensors(organization string) error {
-	key := getKeyFromPath(cu.BlockedStatusPath)
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
+	org := getKeyFromPath(cu.OrganizationUUIDPath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -237,13 +238,11 @@ func (cu *ChefUpdater) ResetSensors(organization string) error {
 			continue
 		}
 
-		if attributes[cu.OrganizationUUIDPath] == organization ||
-			organization == "*" {
-			attributes[key] = false
-		}
-
-		if cu.client != nil {
-			cu.client.Nodes.Put(*node)
+		if attributes[org] == organization || organization == "*" {
+			attributes[blocked] = false
+			if cu.client != nil {
+				cu.client.Nodes.Put(*node)
+			}
 		}
 	}
 
