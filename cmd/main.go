@@ -33,6 +33,8 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
+const genericProductType = 999
+
 var (
 	version    string
 	configFile string
@@ -246,7 +248,7 @@ func main() {
 					lastBlocked = time.Now()
 					org := string(m)
 
-					errs := chefUpdater.BlockOrganization(org)
+					errs := chefUpdater.BlockOrganization(org, genericProductType)
 					if err != nil {
 						for _, err := range errs {
 							log.Warnf("Error blocking sensor %s: %s", org, err.Error())

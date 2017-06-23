@@ -114,7 +114,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(
 	address net.IP, serialNumber string, obsID uint32, deviceID uint32) error {
-	deviceIDKey := getKeyFromPath(cu.ProductTypePath)
+	pType := getKeyFromPath(cu.ProductTypePath)
 
 	var (
 		ok                 bool
@@ -128,12 +128,12 @@ func (cu *ChefUpdater) UpdateNode(
 		return errors.New("Node not found")
 	}
 
-	deviceIDAttributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
+	attributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
 	if err != nil {
 		return err
 	}
 
-	if nodeProductType, ok = deviceIDAttributes[deviceIDKey]; !ok {
+	if nodeProductType, ok = attributes[pType]; !ok {
 		return errors.New("Sensor " + serialNumber + " does not have a Product Type")
 	}
 
@@ -174,10 +174,11 @@ func (cu *ChefUpdater) UpdateNode(
 
 // BlockOrganization iterates a node list and block all sensor belonging to an
 // organization.
-func (cu *ChefUpdater) BlockOrganization(organization string) []error {
+func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32) []error {
 	var errs []error
 	blocked := getKeyFromPath(cu.BlockedStatusPath)
 	org := getKeyFromPath(cu.OrganizationUUIDPath)
+	pType := getKeyFromPath(cu.ProductTypePath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -187,9 +188,20 @@ func (cu *ChefUpdater) BlockOrganization(organization string) []error {
 		}
 
 		if attributes[org] == organization || organization == "*" {
-			attributes[blocked] = true
-			if cu.client != nil {
-				cu.client.Nodes.Put(*node)
+			nodeProductType, err :=
+				strconv.ParseUint(attributes[pType].(string), 10, 32)
+
+			if err != nil || uint32(nodeProductType) == productType {
+				if err != nil {
+					errs = append(errs, errors.New(
+						"Blocking sensor with unknown product type"),
+					)
+				}
+
+				attributes[blocked] = true
+				if cu.client != nil {
+					cu.client.Nodes.Put(*node)
+				}
 			}
 		}
 	}
