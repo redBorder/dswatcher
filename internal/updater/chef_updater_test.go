@@ -47,7 +47,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org": map[string]interface{}{
 				"uuid":              "0000",
 				"serial_number":     "888888",
-				"device_id":         "224",
+				"product_type":      "999",
 				"organization_uuid": "abcde",
 				"blocked":           false,
 			},
@@ -58,7 +58,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org2": map[string]interface{}{
 				"uuid":          "1111",
 				"serial_number": "777777",
-				"device_id":     "123",
+				"product_type":  "123",
 				"blocked":       false,
 			},
 		},
@@ -68,6 +68,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
 				"organization_uuid": "fghij",
+				"product_type":      "123",
 				"blocked":           false,
 			},
 		},
@@ -148,13 +149,11 @@ func TestBlockOrganization(t *testing.T) {
 		SensorUUIDPath:       "org/uuid",
 		BlockedStatusPath:    "org/blocked",
 		OrganizationUUIDPath: "org/organization_uuid",
+		ProductTypePath:      "org/product_type",
 	})
 	assert.NoError(t, err)
 
 	chefUpdater.nodes = bootstrapSensorsDB()
-
-	errs := chefUpdater.BlockOrganization("abcde")
-	assert.Equal(t, 2, len(errs))
 
 	var attributes map[string]interface{}
 	var ok bool
@@ -163,7 +162,15 @@ func TestBlockOrganization(t *testing.T) {
 		chefUpdater.nodes["0"].NormalAttributes,
 		chefUpdater.BlockedStatusPath)
 
+	errs := chefUpdater.BlockOrganization("abcde", 123)
+	assert.Equal(t, 2, len(errs))
+
 	assert.NoError(t, err)
+	assert.False(t, attributes["blocked"].(bool))
+
+	errs = chefUpdater.BlockOrganization("abcde", 999)
+	assert.Equal(t, 2, len(errs))
+
 	assert.True(t, attributes["blocked"].(bool))
 
 	attributes, err = getParent(
@@ -227,14 +234,14 @@ func TestUpdateNode(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org/uuid",
-			ProductTypePath:  "org/device_id",
+			ProductTypePath:  "org/product_type",
 			SerialNumberPath: "org/serial_number",
 			IPAddressPath:    "org/ipaddress",
 		},
 	}
 
 	address := make(net.IP, 4)
-	err := chefUpdater.UpdateNode(address, "888888", 10, 224)
+	err := chefUpdater.UpdateNode(address, "888888", 10, 999)
 	assert.NoError(t, err)
 
 	attrs, err := getParent(chefUpdater.nodes["0"].NormalAttributes,
