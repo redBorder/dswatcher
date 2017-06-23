@@ -49,6 +49,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 				"serial_number":     "888888",
 				"device_id":         "224",
 				"organization_uuid": "abcde",
+				"blocked":           false,
 			},
 		},
 	}
@@ -58,6 +59,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 				"uuid":          "1111",
 				"serial_number": "777777",
 				"device_id":     "123",
+				"blocked":       false,
 			},
 		},
 	}
@@ -66,6 +68,7 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
 				"organization_uuid": "fghij",
+				"blocked":           false,
 			},
 		},
 	}
@@ -138,18 +141,19 @@ func TestBlockSensors(t *testing.T) {
 	assert.False(t, blocked)
 }
 
-func TestBlockAllSensors(t *testing.T) {
+func TestBlockOrganization(t *testing.T) {
 	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		AccessKey:         testPEMKey,
-		Name:              "test",
-		SensorUUIDPath:    "org/uuid",
-		BlockedStatusPath: "org/blocked",
+		AccessKey:            testPEMKey,
+		Name:                 "test",
+		SensorUUIDPath:       "org/uuid",
+		BlockedStatusPath:    "org/blocked",
+		OrganizationUUIDPath: "org/organization_uuid",
 	})
 	assert.NoError(t, err)
 
 	chefUpdater.nodes = bootstrapSensorsDB()
 
-	errs := chefUpdater.BlockAllSensors()
+	errs := chefUpdater.BlockOrganization("abcde")
 	assert.Equal(t, 2, len(errs))
 
 	var attributes map[string]interface{}
@@ -175,7 +179,7 @@ func TestBlockAllSensors(t *testing.T) {
 		chefUpdater.BlockedStatusPath)
 
 	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
+	assert.False(t, attributes["blocked"].(bool))
 
 	attributes, err = getParent(
 		chefUpdater.nodes["3"].NormalAttributes,

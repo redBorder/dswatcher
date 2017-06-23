@@ -244,35 +244,21 @@ func main() {
 					}
 
 					lastBlocked = time.Now()
-					uuid := updater.UUID(m)
+					org := string(m)
 
-					if uuid == "*" {
-						errs := chefUpdater.BlockAllSensors()
-
-						if len(errs) == 0 {
-							log.Infoln("Blocked all sensors")
-						} else {
-							log.Warnf("Not all sensors could be blocked")
-						}
-
+					errs := chefUpdater.BlockOrganization(org)
+					if err != nil {
 						for _, err := range errs {
-							log.Warnf("Error blocking sensor: %s", err.Error())
+							log.Warnf("Error blocking sensor %s: %s", org, err.Error())
 						}
-					} else {
-						blocked, err := chefUpdater.BlockSensor(uuid)
-						if err != nil {
-							log.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
-							continue receiving
-						}
-
-						if blocked {
-							log.Infoln("Blocked UUID: " + uuid)
-						}
+						continue receiving
 					}
+
+					log.Infoln("Blocked organization: " + org)
 
 				case consumer.ResetSignal:
 					if m.Organization == "" {
-						log.Warnf("Received reset signal without uuid")
+						log.Warnf("Received reset signal without organization UUID")
 						continue receiving
 					}
 
@@ -283,7 +269,7 @@ func main() {
 					}
 
 					log.Infof(
-						"Sensors for organization '%s' has been reset", m.Organization,
+						"Sensors for organization '%s' has been unblocked", m.Organization,
 					)
 
 				default:

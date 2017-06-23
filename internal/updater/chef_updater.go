@@ -172,10 +172,12 @@ func (cu *ChefUpdater) UpdateNode(
 	return nil
 }
 
-// BlockAllSensors iterates a node list and block all sensor on the list.
-func (cu *ChefUpdater) BlockAllSensors() []error {
+// BlockOrganization iterates a node list and block all sensor belonging to an
+// organization.
+func (cu *ChefUpdater) BlockOrganization(organization string) []error {
 	var errs []error
-	key := getKeyFromPath(cu.BlockedStatusPath)
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
+	org := getKeyFromPath(cu.OrganizationUUIDPath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -184,10 +186,11 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 			continue
 		}
 
-		attributes[key] = true
-
-		if cu.client != nil {
-			cu.client.Nodes.Put(*node)
+		if attributes[org] == organization || organization == "*" {
+			attributes[blocked] = true
+			if cu.client != nil {
+				cu.client.Nodes.Put(*node)
+			}
 		}
 	}
 
@@ -197,7 +200,7 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 // BlockSensor gets a list of nodes an look for one with the given address. If a
 // node is found will update the deviceID.
 // If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
+func (cu *ChefUpdater) BlockSensor(uuid string) (bool, error) {
 	key := getKeyFromPath(cu.BlockedStatusPath)
 
 	node := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
