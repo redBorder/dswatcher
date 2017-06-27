@@ -49,6 +49,9 @@ type ChefUpdaterConfig struct {
 	BlockedStatusPath    string
 	ProductTypePath      string
 	OrganizationUUIDPath string
+	LicenseUUIDPath      string
+	DataBagName          string
+	DataBagItem          string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -80,6 +83,39 @@ func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 	return updater, nil
 }
 
+func (cu *ChefUpdater) fetchLicenses() error {
+	licK := getKeyFromPath(cu.LicenseUUIDPath)
+
+	items, err := cu.client.DataBags.GetItem(cu.DataBagName, cu.DataBagItem)
+	if err != nil {
+		return errors.New("Couldn't get items from data bag: " + err.Error())
+	}
+
+	sensorsIf, ok := items.(map[string]interface{})
+	if !ok {
+		return errors.New("Couldn't get sensors from data bag")
+	}
+
+	sensors, ok := sensorsIf["sensors"].(map[string]interface{})
+	if !ok {
+		return errors.New("Couldn't get sensors from data bag. Failed assertion to " +
+			"\"map[string]interface{}\"")
+	}
+
+	for k, v := range sensors {
+		if node, ok := cu.nodes[k]; ok {
+			attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+			if err != nil {
+				return errors.New("Error getting node info: " + err.Error())
+			}
+
+			attributes[licK] = v.(map[string]interface{})["license"].(string)
+		}
+	}
+
+	return nil
+}
+
 // FetchNodes updates the internal node database and keep it in memory
 func (cu *ChefUpdater) FetchNodes() error {
 	nodeList, err := cu.client.Nodes.List()
@@ -104,6 +140,10 @@ func (cu *ChefUpdater) FetchNodes() error {
 		}
 
 		cu.nodes[sensorUUID] = &node
+	}
+
+	if err := cu.fetchLicenses(); err != nil {
+		return errors.New("Error fetching licenses: " + err.Error())
 	}
 
 	return nil
