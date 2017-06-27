@@ -239,6 +239,7 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 				}
 
 				attributes[blocked] = true
+
 				if cu.client != nil {
 					cu.client.Nodes.Put(*node)
 				}
@@ -249,36 +250,30 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 	return errs
 }
 
-// BlockSensor gets a list of nodes an look for one with the given address. If a
-// node is found will update the deviceID.
-// If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) BlockSensor(uuid string) (bool, error) {
-	key := getKeyFromPath(cu.BlockedStatusPath)
+// BlockLicense iterates a node list and block all sensor belonging to an
+// organization.
+func (cu *ChefUpdater) BlockLicense(license string) []error {
+	var errs []error
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
+	lic := getKeyFromPath(cu.LicenseUUIDPath)
 
-	node := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
-	if node == nil {
-		return false, errors.New("Node not found")
-	}
+	for _, node := range cu.nodes {
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
 
-	attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-	if err != nil {
-		return false, err
-	}
+		if attributes[lic] == license {
+			attributes[blocked] = true
 
-	if blocked, ok :=
-		attributes[key].(bool); ok {
-		if blocked {
-			return false, nil
+			if cu.client != nil {
+				cu.client.Nodes.Put(*node)
+			}
 		}
 	}
 
-	attributes[key] = true
-
-	if cu.client != nil {
-		cu.client.Nodes.Put(*node)
-	}
-
-	return true, nil
+	return errs
 }
 
 // ResetSensors sets the blocked status to false for sensors belonging to an

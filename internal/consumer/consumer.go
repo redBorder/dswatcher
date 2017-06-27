@@ -20,8 +20,11 @@ package consumer
 // Message can be either an UUID to be blocked or a ResetSignal
 type Message interface{}
 
-// UUID identifies the sensor that reached the limit
-type UUID string
+// BlockOrganization identifies the organization that reached the limit
+type BlockOrganization string
+
+// BlockLicense identifies the license that has expired
+type BlockLicense string
 
 // ResetSignal notifies that sensors from a given organization should be
 // unblocked.
@@ -38,5 +41,5 @@ type FlowData struct {
 // NetflowConsumer gets an IP address and Netflow data from a resource
 type NetflowConsumer interface {
 	ConsumeNetflow() (messages chan FlowData, events chan string)
-	ConsumeLimits() (messages chan UUID, events chan string)
+	ConsumeLimits() (messages chan Message, events chan string)
 }

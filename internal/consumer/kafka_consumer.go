@@ -143,7 +143,10 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 
 			switch data.Type {
 			case "limit_reached":
-				messages <- UUID(data.UUID)
+				messages <- BlockOrganization(data.UUID)
+
+			case "license_expired":
+				messages <- BlockLicense(data.UUID)
 
 			case "counters_reset":
 				messages <- ResetSignal{

@@ -108,40 +108,6 @@ func TestFindNode(t *testing.T) {
 	assert.Nil(t, node)
 }
 
-func TestBlockSensors(t *testing.T) {
-	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		AccessKey:         testPEMKey,
-		Name:              "test",
-		SensorUUIDPath:    "org/uuid",
-		BlockedStatusPath: "org/blocked",
-	})
-	assert.NoError(t, err)
-
-	chefUpdater.nodes = bootstrapSensorsDB()
-
-	blocked, err := chefUpdater.BlockSensor("0000")
-	assert.NoError(t, err)
-	attributes, err := getParent(
-		chefUpdater.nodes["0"].NormalAttributes,
-		chefUpdater.BlockedStatusPath)
-	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
-	assert.True(t, blocked)
-
-	blocked, err = chefUpdater.BlockSensor("0000")
-	assert.NoError(t, err)
-	attributes, err = getParent(
-		chefUpdater.nodes["0"].NormalAttributes,
-		chefUpdater.BlockedStatusPath)
-	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
-	assert.False(t, blocked)
-
-	blocked, err = chefUpdater.BlockSensor("7777")
-	assert.Error(t, err)
-	assert.False(t, blocked)
-}
-
 func TestBlockOrganization(t *testing.T) {
 	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
 		AccessKey:            testPEMKey,
