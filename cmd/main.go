@@ -117,6 +117,9 @@ func main() {
 		BlockedStatusPath:    config.Updater.BlockedStatusPath,
 		ProductTypePath:      config.Updater.ProductTypePath,
 		OrganizationUUIDPath: config.Updater.OrganizationUUIDPath,
+		LicenseUUIDPath:      config.Updater.LicenseUUIDPath,
+		DataBagName:          config.Updater.DataBagName,
+		DataBagItem:          config.Updater.DataBagItem,
 	})
 	if err != nil {
 		log.Fatal("Error creating Chef API client: " + err.Error())
@@ -239,7 +242,7 @@ func main() {
 				}
 
 				switch m := message.(type) {
-				case consumer.UUID:
+				case consumer.BlockOrganization:
 					if time.Since(lastBlocked) <
 						time.Duration(config.Updater.UpdateInterval)*time.Second {
 						continue receiving
@@ -257,6 +260,19 @@ func main() {
 					}
 
 					log.Infoln("Blocked organization: " + org)
+
+				case consumer.BlockLicense:
+					license := string(m)
+
+					errs := chefUpdater.BlockLicense(license)
+					if err != nil {
+						for _, err := range errs {
+							log.Warnf("Error blocking license %s: %s", license, err.Error())
+						}
+						continue receiving
+					}
+
+					log.Infoln("Blocked license: " + license)
 
 				case consumer.ResetSignal:
 					if m.Organization == "" {

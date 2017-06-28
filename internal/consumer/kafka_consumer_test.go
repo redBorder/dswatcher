@@ -320,7 +320,7 @@ func TestLimitsConsumer(t *testing.T) {
 				messages, _ := consumer.ConsumeLimits()
 				msg := <-messages
 
-				uuid, ok := msg.(UUID)
+				uuid, ok := msg.(BlockOrganization)
 				So(ok, ShouldBeTrue)
 				So(uuid, ShouldEqual, "7416ba90-926b-475f-a26e-53fe1a7e3c36")
 
