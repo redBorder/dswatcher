@@ -19,25 +19,27 @@ package updater
 
 import (
 	"errors"
-	"net"
-	"strconv"
 	"strings"
 
 	"github.com/go-chef/chef"
 )
 
-///////////////
-//Interfaces //
-///////////////
+// DataBagService is used for obtain information about licenses from chef.
+type DataBagService interface {
+	GetItem(string, string) (chef.DataBagItem, error)
+}
 
-// ChefAPIClient is an interface for a chef api client
-type ChefAPIClient interface {
-	NewClient(interface{}) interface{}
+// NodeService is used for obtain node attributes from chef.
+type NodeService interface {
+	List() (map[string]string, error)
+	Get(string) (chef.Node, error)
+	Put(chef.Node) (chef.Node, error)
 }
 
 // ChefUpdaterConfig contains the configuration for a ChefUpdater.
 type ChefUpdaterConfig struct {
-	client *chef.Client
+	DataBagService DataBagService
+	NodeService    NodeService
 
 	Name                 string
 	URL                  string
@@ -54,39 +56,215 @@ type ChefUpdaterConfig struct {
 	DataBagItem          string
 }
 
-// ChefUpdater uses the Chef client API to update a sensor node with an IP
-// address.
+// ChefUpdater uses the Chef client API to update sensors node attributes.
 type ChefUpdater struct {
-	nodes map[string]*chef.Node
+	nodes          map[string]*chef.Node
+	dataBagService DataBagService
+	nodeService    NodeService
 
-	ChefUpdaterConfig
+	config *ChefUpdaterConfig
 }
 
 // NewChefUpdater creates a new instance of a ChefUpdater.
-func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
-	updater := &ChefUpdater{
-		nodes:             make(map[string]*chef.Node),
-		ChefUpdaterConfig: config,
+func NewChefUpdater(config *ChefUpdaterConfig) *ChefUpdater {
+	if config.NodeService == nil {
+		panic("NodeService can't be nil")
+	}
+	if config.DataBagService == nil {
+		panic("DataBagService can't be nil")
 	}
 
-	client, err := chef.NewClient(&chef.Config{
-		Name:    updater.Name,
-		Key:     updater.AccessKey,
-		BaseURL: updater.URL,
-	})
-	if err != nil {
-		return nil, errors.New("Error creating client: " + err.Error())
+	return &ChefUpdater{
+		config:         config,
+		nodes:          make(map[string]*chef.Node),
+		nodeService:    config.NodeService,
+		dataBagService: config.DataBagService,
 	}
-
-	updater.client = client
-
-	return updater, nil
 }
 
-func (cu *ChefUpdater) fetchLicenses() error {
-	licK := getKeyFromPath(cu.LicenseUUIDPath)
+/////////////
+// Public  //
+/////////////
 
-	items, err := cu.client.DataBags.GetItem(cu.DataBagName, cu.DataBagItem)
+// Fetch gets data from available sensors in chef. Since licenses are not
+// stored on nodes it's necessary to fetch them from a data bag.
+func (cu *ChefUpdater) Fetch() error {
+	var err error
+
+	err = cu.fetchNodes()
+	if err != nil {
+		return err
+	}
+
+	err = cu.fetchLicenses()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SetProductType gets a node by its IP address and update the product type. An
+// is returned when a node is not found.
+//
+// This method uses an internal database, so Fetch() should be called
+// periodically to keep the internal database synced with the Chef nodes.
+// func (cu *ChefUpdater) SetProductType(
+// 	address net.IP, serialNumber string, obsID, productType uint32) error {
+// 	pType := getKeyFromPath(cu.config.ProductTypePath)
+//
+// 	var (
+// 		ok                 bool
+// 		nodeProductType    interface{}
+// 		nodeProductTypeStr string
+// 		nodeProductTypeInt uint64
+// 	)
+//
+// 	node := findNode(cu.config.SerialNumberPath, serialNumber, cu.nodes)
+// 	if node == nil {
+// 		return errors.New("Node not found")
+// 	}
+//
+// 	attributes, err := getParent(node.NormalAttributes, cu.config.ProductTypePath)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	if nodeProductType, ok = attributes[pType]; !ok {
+// 		return errors.New(
+// 			"Sensor " + serialNumber + " does not have a Product Type",
+// 		)
+// 	}
+//
+// 	if nodeProductTypeStr, ok = nodeProductType.(string); !ok {
+// 		return errors.New("Product Type is not string")
+// 	}
+//
+// 	nodeProductTypeInt, err = strconv.ParseUint(nodeProductTypeStr, 10, 32)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	if uint32(nodeProductTypeInt) != productType {
+// 		return errors.New(
+// 			"Product Type for " + address.String() + " does not match",
+// 		)
+// 	}
+//
+// 	ipaddressAttributes, err :=
+// 		getParent(node.NormalAttributes, cu.config.IPAddressPath)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	observationIDAttributes, err :=
+// 		getParent(node.NormalAttributes, cu.config.ObservationIDPath)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+// 	ipaddressAttributes[getKeyFromPath(cu.config.IPAddressPath)] =
+// 		address.String()
+// 	observationIDAttributes[getKeyFromPath(cu.config.ObservationIDPath)] =
+// 		strconv.FormatUint(uint64(obsID), 10)
+//
+// 	cu.nodeService.Put(*node)
+//
+// 	return nil
+// }
+
+// BlockOrganization iterates a node list and block all sensor belonging to an
+// organization.
+// func (cu *ChefUpdater) BlockOrganization(
+// 	organization string, productType uint32,
+// ) []error {
+// 	var errs []error
+//
+// 	blocked := getKeyFromPath(cu.config.BlockedStatusPath)
+// 	org := getKeyFromPath(cu.config.OrganizationUUIDPath)
+// 	pType := getKeyFromPath(cu.config.ProductTypePath)
+//
+// 	for _, node := range cu.nodes {
+// 		attributes, err :=
+// 			getParent(node.NormalAttributes, cu.config.BlockedStatusPath)
+// 		if err != nil {
+// 			errs = append(errs, err)
+// 			continue
+// 		}
+//
+// 		if attributes[org] == organization || organization == "*" {
+// 			nodeProductType, err :=
+// 				strconv.ParseUint(attributes[pType].(string), 10, 32)
+//
+// 			if err != nil || uint32(nodeProductType) == productType {
+// 				if err != nil {
+// 					errs = append(errs, errors.New(
+// 						"Blocking sensor with unknown product type"),
+// 					)
+// 				}
+//
+// 				attributes[blocked] = true
+// 				cu.nodeService.Put(*node)
+// 			}
+// 		}
+// 	}
+//
+// 	return errs
+// }
+
+// BlockLicense iterates a node list and block all sensor belonging to an
+// organization.
+// func (cu *ChefUpdater) BlockLicense(license string) []error {
+// 	var errs []error
+// 	blocked := getKeyFromPath(cu.config.BlockedStatusPath)
+// 	lic := getKeyFromPath(cu.config.LicenseUUIDPath)
+//
+// 	for _, node := range cu.nodes {
+// 		attributes, err :=
+// 			getParent(node.NormalAttributes, cu.config.BlockedStatusPath)
+// 		if err != nil {
+// 			errs = append(errs, err)
+// 			continue
+// 		}
+//
+// 		if attributes[lic] == license {
+// 			attributes[blocked] = true
+// 			cu.nodeService.Put(*node)
+// 		}
+// 	}
+//
+// 	return errs
+// }
+
+// ResetSensors sets the blocked status to false for sensors belonging to an
+// organization
+// func (cu *ChefUpdater) ResetSensors(organization string) error {
+// 	blocked := getKeyFromPath(cu.config.BlockedStatusPath)
+// 	org := getKeyFromPath(cu.config.OrganizationUUIDPath)
+//
+// 	for _, node := range cu.nodes {
+// 		attributes, err :=
+// 			getParent(node.NormalAttributes, cu.config.BlockedStatusPath)
+// 		if err != nil {
+// 			continue
+// 		}
+//
+// 		if attributes[org] == organization || organization == "*" {
+// 			attributes[blocked] = false
+// 			cu.nodeService.Put(*node)
+// 		}
+// 	}
+//
+// 	return nil
+// }
+
+//////////////
+// Private  //
+//////////////
+
+func (cu *ChefUpdater) fetchLicenses() error {
+	items, err :=
+		cu.dataBagService.GetItem(cu.config.DataBagName, cu.config.DataBagItem)
 	if err != nil {
 		return errors.New("Couldn't get items from data bag: " + err.Error())
 	}
@@ -98,18 +276,14 @@ func (cu *ChefUpdater) fetchLicenses() error {
 
 	sensors, ok := sensorsIf["sensors"].(map[string]interface{})
 	if !ok {
-		return errors.New("Couldn't get sensors from data bag. Failed assertion to " +
-			"\"map[string]interface{}\"")
+		return errors.New("Couldn't get sensors from data bag. Failed assertion " +
+			"to \"map[string]interface{}\"")
 	}
 
 	for k, v := range sensors {
 		if node, ok := cu.nodes[k]; ok {
-			attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-			if err != nil {
-				return errors.New("Error getting node info: " + err.Error())
-			}
-
-			attributes[licK] = v.(map[string]interface{})["license"].(string)
+			a := v.(map[string]interface{})["license"]
+			setNodeAttribute(node.NormalAttributes, cu.config.LicenseUUIDPath, a)
 		}
 	}
 
@@ -117,197 +291,53 @@ func (cu *ChefUpdater) fetchLicenses() error {
 }
 
 // FetchNodes updates the internal node database and keep it in memory
-func (cu *ChefUpdater) FetchNodes() error {
-	nodeList, err := cu.client.Nodes.List()
+func (cu *ChefUpdater) fetchNodes() error {
+	nodeList, err := cu.nodeService.List()
+
 	if err != nil {
 		return errors.New("Couldn't list nodes: " + err.Error())
 	}
 
 	for n := range nodeList {
-		node, err := cu.client.Nodes.Get(n)
+		node, err := cu.nodeService.Get(n)
 		if err != nil {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getParent(node.NormalAttributes, cu.SerialNumberPath)
+		sensorUUID, err :=
+			getNodeAttribute(node.NormalAttributes, cu.config.SensorUUIDPath)
 		if err != nil {
-			return errors.New("Error getting node info: " + err.Error())
+			return errors.New(
+				"Error getting node attribute: " +
+					cu.config.SensorUUIDPath + "" + err.Error(),
+			)
 		}
 
-		sensorUUID, ok := attributes[getKeyFromPath(cu.SensorUUIDPath)].(string)
-		if !ok {
-			continue
-		}
-
-		cu.nodes[sensorUUID] = &node
-	}
-
-	if err := cu.fetchLicenses(); err != nil {
-		return errors.New("Error fetching licenses: " + err.Error())
-	}
-
-	return nil
-}
-
-// UpdateNode gets a list of nodes an look for one with the given address. If a
-// node is found will update the deviceID.
-// If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) UpdateNode(
-	address net.IP, serialNumber string, obsID uint32, deviceID uint32) error {
-	pType := getKeyFromPath(cu.ProductTypePath)
-
-	var (
-		ok                 bool
-		nodeProductType    interface{}
-		nodeProductTypeStr string
-		nodeProductTypeInt uint64
-	)
-
-	node := findNode(cu.SerialNumberPath, serialNumber, cu.nodes)
-	if node == nil {
-		return errors.New("Node not found")
-	}
-
-	attributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
-	if err != nil {
-		return err
-	}
-
-	if nodeProductType, ok = attributes[pType]; !ok {
-		return errors.New("Sensor " + serialNumber + " does not have a Product Type")
-	}
-
-	if nodeProductTypeStr, ok = nodeProductType.(string); !ok {
-		return errors.New("Product Type is not string")
-	}
-
-	nodeProductTypeInt, err = strconv.ParseUint(nodeProductTypeStr, 10, 32)
-	if err != nil {
-		return err
-	}
-
-	if uint32(nodeProductTypeInt) != deviceID {
-		return errors.New("Product Type for " + address.String() + " does not match")
-	}
-
-	ipaddressAttributes, err := getParent(node.NormalAttributes, cu.IPAddressPath)
-	if err != nil {
-		return err
-	}
-
-	observationIDAttributes, err :=
-		getParent(node.NormalAttributes, cu.ObservationIDPath)
-	if err != nil {
-		return err
-	}
-
-	ipaddressAttributes[getKeyFromPath(cu.IPAddressPath)] = address.String()
-	observationIDAttributes[getKeyFromPath(cu.ObservationIDPath)] =
-		strconv.FormatUint(uint64(obsID), 10)
-
-	if cu.client != nil {
-		cu.client.Nodes.Put(*node)
-	}
-
-	return nil
-}
-
-// BlockOrganization iterates a node list and block all sensor belonging to an
-// organization.
-func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32) []error {
-	var errs []error
-	blocked := getKeyFromPath(cu.BlockedStatusPath)
-	org := getKeyFromPath(cu.OrganizationUUIDPath)
-	pType := getKeyFromPath(cu.ProductTypePath)
-
-	for _, node := range cu.nodes {
-		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		if attributes[org] == organization || organization == "*" {
-			nodeProductType, err :=
-				strconv.ParseUint(attributes[pType].(string), 10, 32)
-
-			if err != nil || uint32(nodeProductType) == productType {
-				if err != nil {
-					errs = append(errs, errors.New(
-						"Blocking sensor with unknown product type"),
-					)
-				}
-
-				attributes[blocked] = true
-
-				if cu.client != nil {
-					cu.client.Nodes.Put(*node)
-				}
-			}
-		}
-	}
-
-	return errs
-}
-
-// BlockLicense iterates a node list and block all sensor belonging to an
-// organization.
-func (cu *ChefUpdater) BlockLicense(license string) []error {
-	var errs []error
-	blocked := getKeyFromPath(cu.BlockedStatusPath)
-	lic := getKeyFromPath(cu.LicenseUUIDPath)
-
-	for _, node := range cu.nodes {
-		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		if attributes[lic] == license {
-			attributes[blocked] = true
-
-			if cu.client != nil {
-				cu.client.Nodes.Put(*node)
-			}
-		}
-	}
-
-	return errs
-}
-
-// ResetSensors sets the blocked status to false for sensors belonging to an
-// organization
-func (cu *ChefUpdater) ResetSensors(organization string) error {
-	blocked := getKeyFromPath(cu.BlockedStatusPath)
-	org := getKeyFromPath(cu.OrganizationUUIDPath)
-
-	for _, node := range cu.nodes {
-		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-		if err != nil {
-			continue
-		}
-
-		if attributes[org] == organization || organization == "*" {
-			attributes[blocked] = false
-			if cu.client != nil {
-				cu.client.Nodes.Put(*node)
-			}
+		if k, ok := sensorUUID.(string); ok {
+			cu.nodes[k] = &node
+		} else {
+			return errors.New(
+				"Error getting node " + cu.config.SensorUUIDPath + ": " + err.Error(),
+			)
 		}
 	}
 
 	return nil
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////
+// Functions //
+///////////////
 
-// getParent receives the root object containing all the attributes of the
+// getParent receives the root object containing the attributes of the
 // node and returns the inner object given a path
-func getParent(root map[string]interface{}, path string) (map[string]interface{}, error) {
-	keys := strings.Split(path, "/")
+func getNodeAttribute(root map[string]interface{}, path string,
+) (interface{}, error) {
 	var ok bool
 
+	keys := strings.Split(path, "/")
 	attrs := root
+
 	for i, key := range keys {
 		if i < len(keys)-1 {
 			if attrs, ok = attrs[key].(map[string]interface{}); !ok || attrs == nil {
@@ -316,26 +346,55 @@ func getParent(root map[string]interface{}, path string) (map[string]interface{}
 		}
 	}
 
-	return attrs, nil
+	ret, ok := attrs[getKeyFromPath(path)]
+	if !ok {
+		return nil, errors.New("Cannot get attribute")
+	}
+
+	return ret, nil
 }
 
-func findNode(keyPath string, value string, nodes map[string]*chef.Node,
-) (node *chef.Node) {
-	key := getKeyFromPath(keyPath)
+// setNodeAttribute receives the root object containing the attributes of the
+// node and set a value for a given key, where the key can be a path like
+// "organization/acme/sensor_uuid".
+func setNodeAttribute(
+	root map[string]interface{}, path string, value interface{},
+) error {
+	var ok bool
 
-	for _, node := range nodes {
-		attributes, err := getParent(node.NormalAttributes, keyPath)
-		if err != nil {
-			continue
-		}
+	keys := strings.Split(path, "/")
+	attrs := root
 
-		if attributes[key] == value {
-			return node
+	for i, key := range keys {
+		if i < len(keys)-1 {
+			if attrs, ok = attrs[key].(map[string]interface{}); !ok || attrs == nil {
+				return errors.New("Cannot find key: " + path)
+			}
 		}
 	}
 
+	attrs[getKeyFromPath(path)] = value
+
 	return nil
 }
+
+// func findNode(keyPath string, value string, nodes map[string]*chef.Node,
+// ) (node *chef.Node) {
+// 	key := getKeyFromPath(keyPath)
+//
+// 	for _, node := range nodes {
+// 		attributes, err := getParent(node.NormalAttributes, keyPath)
+// 		if err != nil {
+// 			continue
+// 		}
+//
+// 		if attributes[key] == value {
+// 			return node
+// 		}
+// 	}
+//
+// 	return nil
+// }
 
 func getKeyFromPath(path string) string {
 	keys := strings.Split(path, "/")
