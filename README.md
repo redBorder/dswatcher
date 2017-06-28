@@ -78,9 +78,9 @@ broker:
   address: kafka:9092        # Kafka host
   consumer_group: dswatcher  # Kafka consumer group ID
   netflow_topics:
-    - rb_flow_discard  # Topic to look up for the Option Template where the serial number is
+    - flow_discard_topic     # Topic to look up for the Option Template where the serial number is
   limits_topics:
-    - rb_limits        # Topic listen for notification about sensors limits
+    - limits_topic           # Topic listen for notification about sensors limits
 
 decoder:
   element_id: 300              # Netflow element id of the serial number
@@ -98,5 +98,11 @@ updater:
   product_type_path: org/product_type           # Path to the Product Type to verify
   fetch_interval_s: 60                          # Time between updates of the internal sensors database
   blocked_status_path: org/blocked              # Path to the block status
+  update_interval_s: 30                         # Time between updates of the Chef node
+  organization_uuid_path: org/organization_uuid # Organization UUID path of the key used to block sensors
+  license_uuid_path: org/license_uuid           # License UUID path of the key used to block sensors
+  data_bag_name: rBglobal                       # Name of the data bag where the licenses are stored
+  data_bag_item: licenses                       # Item in the data bag where the licenses are stored
+  fetch_interval_s: 60                          # Time between updates of the internal sensors database
   update_interval_s: 30                         # Time between updates of the Chef node
 ```
