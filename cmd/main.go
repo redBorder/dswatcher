@@ -261,34 +261,25 @@ func main() {
 
 					log.Infoln("Blocked organization: " + org)
 
-				case consumer.BlockLicense:
-					license := string(m)
-
-					errs := chefUpdater.BlockLicense(license)
+				case consumer.AllowLicense:
+					errs := chefUpdater.AllowLicense(m.License)
 					if err != nil {
 						for _, err := range errs {
-							log.Warnf("Error blocking license %s: %s", license, err.Error())
+							log.Warnf("Error blocking license %s: %s", m.License, err.Error())
 						}
 						continue receiving
 					}
 
-					log.Infoln("Blocked license: " + license)
+					log.Infoln("Allowed license: " + m.License)
 
-				case consumer.ResetSignal:
-					if m.Organization == "" {
-						log.Warnf("Received reset signal without organization UUID")
-						continue receiving
-					}
-
-					err := chefUpdater.ResetSensors(m.Organization)
+				case consumer.ResetSensors:
+					err := chefUpdater.ResetAllSensors()
 					if err != nil {
 						log.Errorf("Error resetting sensors: %s", err.Error())
 						continue receiving
 					}
 
-					log.Infof(
-						"Sensors for organization '%s' has been unblocked", m.Organization,
-					)
+					log.Infof("All sensors has been reset")
 
 				default:
 					log.Warnln("Unknown message received")

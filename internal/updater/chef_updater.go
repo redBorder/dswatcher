@@ -250,9 +250,9 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 	return errs
 }
 
-// BlockLicense iterates a node list and block all sensor belonging to an
-// organization.
-func (cu *ChefUpdater) BlockLicense(license string) []error {
+// AllowLicense iterates a node list and unblock all sensors with the given
+// license.
+func (cu *ChefUpdater) AllowLicense(license string) []error {
 	var errs []error
 	blocked := getKeyFromPath(cu.BlockedStatusPath)
 	lic := getKeyFromPath(cu.LicenseUUIDPath)
@@ -265,7 +265,7 @@ func (cu *ChefUpdater) BlockLicense(license string) []error {
 		}
 
 		if attributes[lic] == license {
-			attributes[blocked] = true
+			attributes[blocked] = false
 
 			if cu.client != nil {
 				cu.client.Nodes.Put(*node)
@@ -276,11 +276,9 @@ func (cu *ChefUpdater) BlockLicense(license string) []error {
 	return errs
 }
 
-// ResetSensors sets the blocked status to false for sensors belonging to an
-// organization
-func (cu *ChefUpdater) ResetSensors(organization string) error {
+// ResetAllSensors sets the blocked status to true for all sensors
+func (cu *ChefUpdater) ResetAllSensors() error {
 	blocked := getKeyFromPath(cu.BlockedStatusPath)
-	org := getKeyFromPath(cu.OrganizationUUIDPath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -288,11 +286,9 @@ func (cu *ChefUpdater) ResetSensors(organization string) error {
 			continue
 		}
 
-		if attributes[org] == organization || organization == "*" {
-			attributes[blocked] = false
-			if cu.client != nil {
-				cu.client.Nodes.Put(*node)
-			}
+		attributes[blocked] = true
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
 		}
 	}
 

@@ -23,14 +23,14 @@ type Message interface{}
 // BlockOrganization identifies the organization that reached the limit
 type BlockOrganization string
 
-// BlockLicense identifies the license that has expired
-type BlockLicense string
-
-// ResetSignal notifies that sensors from a given organization should be
-// unblocked.
-type ResetSignal struct {
-	Organization string
+// AllowLicense reports a valid license.
+type AllowLicense struct {
+	License string
 }
+
+// ResetSensors notifies that sensors from a given organization should be
+// unblocked.
+type ResetSensors struct{}
 
 // FlowData contains the IP address of the Netflow exporter and the flow itself
 type FlowData struct {
