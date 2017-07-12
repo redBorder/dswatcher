@@ -33,6 +33,8 @@ import (
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
+const genericProductType = 999
+
 var (
 	version    string
 	configFile string
@@ -115,6 +117,9 @@ func main() {
 		BlockedStatusPath:    config.Updater.BlockedStatusPath,
 		ProductTypePath:      config.Updater.ProductTypePath,
 		OrganizationUUIDPath: config.Updater.OrganizationUUIDPath,
+		LicenseUUIDPath:      config.Updater.LicenseUUIDPath,
+		DataBagName:          config.Updater.DataBagName,
+		DataBagItem:          config.Updater.DataBagItem,
 	})
 	if err != nil {
 		log.Fatal("Error creating Chef API client: " + err.Error())
@@ -237,54 +242,44 @@ func main() {
 				}
 
 				switch m := message.(type) {
-				case consumer.UUID:
+				case consumer.BlockOrganization:
 					if time.Since(lastBlocked) <
 						time.Duration(config.Updater.UpdateInterval)*time.Second {
 						continue receiving
 					}
 
 					lastBlocked = time.Now()
-					uuid := updater.UUID(m)
+					org := string(m)
 
-					if uuid == "*" {
-						errs := chefUpdater.BlockAllSensors()
-
-						if len(errs) == 0 {
-							log.Infoln("Blocked all sensors")
-						} else {
-							log.Warnf("Not all sensors could be blocked")
-						}
-
+					errs := chefUpdater.BlockOrganization(org, genericProductType)
+					if err != nil {
 						for _, err := range errs {
-							log.Warnf("Error blocking sensor: %s", err.Error())
+							log.Warnf("Error blocking sensor %s: %s", org, err.Error())
 						}
-					} else {
-						blocked, err := chefUpdater.BlockSensor(uuid)
-						if err != nil {
-							log.Warnf("Error blocking sensor %s: %s", uuid, err.Error())
-							continue receiving
-						}
-
-						if blocked {
-							log.Infoln("Blocked UUID: " + uuid)
-						}
-					}
-
-				case consumer.ResetSignal:
-					if m.Organization == "" {
-						log.Warnf("Received reset signal without uuid")
 						continue receiving
 					}
 
-					err := chefUpdater.ResetSensors(m.Organization)
+					log.Infoln("Blocked organization: " + org)
+
+				case consumer.AllowLicense:
+					errs := chefUpdater.AllowLicense(m.License)
+					if err != nil {
+						for _, err := range errs {
+							log.Warnf("Error blocking license %s: %s", m.License, err.Error())
+						}
+						continue receiving
+					}
+
+					log.Infoln("Allowed license: " + m.License)
+
+				case consumer.ResetSensors:
+					err := chefUpdater.ResetAllSensors()
 					if err != nil {
 						log.Errorf("Error resetting sensors: %s", err.Error())
 						continue receiving
 					}
 
-					log.Infof(
-						"Sensors for organization '%s' has been resetted", m.Organization,
-					)
+					log.Infof("All sensors has been reset")
 
 				default:
 					log.Warnln("Unknown message received")

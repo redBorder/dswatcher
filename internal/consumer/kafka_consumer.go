@@ -25,13 +25,14 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-type limitMessage struct {
-	Monitor      string `yaml:"monitor"`
-	Type         string `yaml:"type"`
-	UUID         string `yaml:"uuid"`
-	CurrentBytes string `yaml:"current_bytes"`
-	Limit        int64  `yaml:"limit"`
-	Timestamp    int64  `yaml:"timestamp"`
+type signal struct {
+	Monitor      string   `yaml:"monitor"`
+	Type         string   `yaml:"type"`
+	UUID         string   `yaml:"uuid"`
+	CurrentBytes string   `yaml:"current_bytes"`
+	Limit        int64    `yaml:"limit"`
+	Timestamp    int64    `yaml:"timestamp"`
+	Licenses     []string `yaml:"licenses"`
 }
 
 ///////////////
@@ -126,13 +127,17 @@ func (kc *KafkaConsumer) ConsumeNetflow() (chan FlowData, chan string) {
 // ConsumeLimits receives limits messages from the kafka broker.
 // "messages" channel receives actual messages and "info" channel receives
 // notifications from the Kafka broker.
+//
+// - "limit_reached": All sensors belonging to an organization are blocked.
+// - "allowed_licenses": All sensors are blocked and the only the sensors
+// 	 with a valid license are allowed.
 func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 	messages := make(chan Message)
 	inputMessages, info := receiveLoop(kc.LimitsConsumer, kc.terminate)
 
 	go func() {
 		for m := range inputMessages {
-			var data limitMessage
+			var data signal
 			err := json.Unmarshal(m.Value, &data)
 
 			// TODO this should be logged as an error
@@ -143,11 +148,12 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 
 			switch data.Type {
 			case "limit_reached":
-				messages <- UUID(data.UUID)
+				messages <- BlockOrganization(data.UUID)
 
-			case "counters_reset":
-				messages <- ResetSignal{
-					data.UUID,
+			case "allowed_licenses":
+				messages <- ResetSensors{}
+				for _, license := range data.Licenses {
+					messages <- AllowLicense{license}
 				}
 
 			default:

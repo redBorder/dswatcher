@@ -49,6 +49,9 @@ type ChefUpdaterConfig struct {
 	BlockedStatusPath    string
 	ProductTypePath      string
 	OrganizationUUIDPath string
+	LicenseUUIDPath      string
+	DataBagName          string
+	DataBagItem          string
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -80,6 +83,39 @@ func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 	return updater, nil
 }
 
+func (cu *ChefUpdater) fetchLicenses() error {
+	licK := getKeyFromPath(cu.LicenseUUIDPath)
+
+	items, err := cu.client.DataBags.GetItem(cu.DataBagName, cu.DataBagItem)
+	if err != nil {
+		return errors.New("Couldn't get items from data bag: " + err.Error())
+	}
+
+	sensorsIf, ok := items.(map[string]interface{})
+	if !ok {
+		return errors.New("Couldn't get sensors from data bag")
+	}
+
+	sensors, ok := sensorsIf["sensors"].(map[string]interface{})
+	if !ok {
+		return errors.New("Couldn't get sensors from data bag. Failed assertion to " +
+			"\"map[string]interface{}\"")
+	}
+
+	for k, v := range sensors {
+		if node, ok := cu.nodes[k]; ok {
+			attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+			if err != nil {
+				return errors.New("Error getting node info: " + err.Error())
+			}
+
+			attributes[licK] = v.(map[string]interface{})["license"].(string)
+		}
+	}
+
+	return nil
+}
+
 // FetchNodes updates the internal node database and keep it in memory
 func (cu *ChefUpdater) FetchNodes() error {
 	nodeList, err := cu.client.Nodes.List()
@@ -106,6 +142,10 @@ func (cu *ChefUpdater) FetchNodes() error {
 		cu.nodes[sensorUUID] = &node
 	}
 
+	if err := cu.fetchLicenses(); err != nil {
+		return errors.New("Error fetching licenses: " + err.Error())
+	}
+
 	return nil
 }
 
@@ -114,7 +154,7 @@ func (cu *ChefUpdater) FetchNodes() error {
 // If a node with the given address is not found an error is returned
 func (cu *ChefUpdater) UpdateNode(
 	address net.IP, serialNumber string, obsID uint32, deviceID uint32) error {
-	deviceIDKey := getKeyFromPath(cu.ProductTypePath)
+	pType := getKeyFromPath(cu.ProductTypePath)
 
 	var (
 		ok                 bool
@@ -128,12 +168,12 @@ func (cu *ChefUpdater) UpdateNode(
 		return errors.New("Node not found")
 	}
 
-	deviceIDAttributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
+	attributes, err := getParent(node.NormalAttributes, cu.ProductTypePath)
 	if err != nil {
 		return err
 	}
 
-	if nodeProductType, ok = deviceIDAttributes[deviceIDKey]; !ok {
+	if nodeProductType, ok = attributes[pType]; !ok {
 		return errors.New("Sensor " + serialNumber + " does not have a Product Type")
 	}
 
@@ -172,10 +212,13 @@ func (cu *ChefUpdater) UpdateNode(
 	return nil
 }
 
-// BlockAllSensors iterates a node list and block all sensor on the list.
-func (cu *ChefUpdater) BlockAllSensors() []error {
+// BlockOrganization iterates a node list and block all sensor belonging to an
+// organization.
+func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32) []error {
 	var errs []error
-	key := getKeyFromPath(cu.BlockedStatusPath)
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
+	org := getKeyFromPath(cu.OrganizationUUIDPath)
+	pType := getKeyFromPath(cu.ProductTypePath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -184,52 +227,58 @@ func (cu *ChefUpdater) BlockAllSensors() []error {
 			continue
 		}
 
-		attributes[key] = true
+		if attributes[org] == organization || organization == "*" {
+			nodeProductType, err :=
+				strconv.ParseUint(attributes[pType].(string), 10, 32)
 
-		if cu.client != nil {
-			cu.client.Nodes.Put(*node)
+			if err != nil || uint32(nodeProductType) == productType {
+				if err != nil {
+					errs = append(errs, errors.New(
+						"Blocking sensor with unknown product type"),
+					)
+				}
+
+				attributes[blocked] = true
+
+				if cu.client != nil {
+					cu.client.Nodes.Put(*node)
+				}
+			}
 		}
 	}
 
 	return errs
 }
 
-// BlockSensor gets a list of nodes an look for one with the given address. If a
-// node is found will update the deviceID.
-// If a node with the given address is not found an error is returned
-func (cu *ChefUpdater) BlockSensor(uuid UUID) (bool, error) {
-	key := getKeyFromPath(cu.BlockedStatusPath)
+// AllowLicense iterates a node list and unblock all sensors with the given
+// license.
+func (cu *ChefUpdater) AllowLicense(license string) []error {
+	var errs []error
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
+	lic := getKeyFromPath(cu.LicenseUUIDPath)
 
-	node := findNode(cu.SensorUUIDPath, string(uuid), cu.nodes)
-	if node == nil {
-		return false, errors.New("Node not found")
-	}
+	for _, node := range cu.nodes {
+		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
 
-	attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
-	if err != nil {
-		return false, err
-	}
+		if attributes[lic] == license {
+			attributes[blocked] = false
 
-	if blocked, ok :=
-		attributes[key].(bool); ok {
-		if blocked {
-			return false, nil
+			if cu.client != nil {
+				cu.client.Nodes.Put(*node)
+			}
 		}
 	}
 
-	attributes[key] = true
-
-	if cu.client != nil {
-		cu.client.Nodes.Put(*node)
-	}
-
-	return true, nil
+	return errs
 }
 
-// ResetSensors sets the blocked status to false for sensors belonging to an
-// organization
-func (cu *ChefUpdater) ResetSensors(organization string) error {
-	key := getKeyFromPath(cu.BlockedStatusPath)
+// ResetAllSensors sets the blocked status to true for all sensors
+func (cu *ChefUpdater) ResetAllSensors() error {
+	blocked := getKeyFromPath(cu.BlockedStatusPath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -237,11 +286,7 @@ func (cu *ChefUpdater) ResetSensors(organization string) error {
 			continue
 		}
 
-		if attributes[cu.OrganizationUUIDPath] == organization ||
-			organization == "*" {
-			attributes[key] = false
-		}
-
+		attributes[blocked] = true
 		if cu.client != nil {
 			cu.client.Nodes.Put(*node)
 		}

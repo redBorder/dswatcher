@@ -47,8 +47,10 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org": map[string]interface{}{
 				"uuid":              "0000",
 				"serial_number":     "888888",
-				"device_id":         "224",
+				"product_type":      "999",
 				"organization_uuid": "abcde",
+				"blocked":           false,
+				"license_uuid":      "0000000000",
 			},
 		},
 	}
@@ -57,7 +59,9 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org2": map[string]interface{}{
 				"uuid":          "1111",
 				"serial_number": "777777",
-				"device_id":     "123",
+				"product_type":  "123",
+				"blocked":       false,
+				"license_uuid":  "0000000000",
 			},
 		},
 	}
@@ -66,6 +70,9 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 		NormalAttributes: map[string]interface{}{
 			"org": map[string]interface{}{
 				"organization_uuid": "fghij",
+				"product_type":      "123",
+				"blocked":           false,
+				"license_uuid":      "1111111111",
 			},
 		},
 	}
@@ -104,53 +111,18 @@ func TestFindNode(t *testing.T) {
 	assert.Nil(t, node)
 }
 
-func TestBlockSensors(t *testing.T) {
+func TestBlockOrganization(t *testing.T) {
 	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		AccessKey:         testPEMKey,
-		Name:              "test",
-		SensorUUIDPath:    "org/uuid",
-		BlockedStatusPath: "org/blocked",
+		AccessKey:            testPEMKey,
+		Name:                 "test",
+		SensorUUIDPath:       "org/uuid",
+		BlockedStatusPath:    "org/blocked",
+		OrganizationUUIDPath: "org/organization_uuid",
+		ProductTypePath:      "org/product_type",
 	})
 	assert.NoError(t, err)
 
 	chefUpdater.nodes = bootstrapSensorsDB()
-
-	blocked, err := chefUpdater.BlockSensor("0000")
-	assert.NoError(t, err)
-	attributes, err := getParent(
-		chefUpdater.nodes["0"].NormalAttributes,
-		chefUpdater.BlockedStatusPath)
-	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
-	assert.True(t, blocked)
-
-	blocked, err = chefUpdater.BlockSensor("0000")
-	assert.NoError(t, err)
-	attributes, err = getParent(
-		chefUpdater.nodes["0"].NormalAttributes,
-		chefUpdater.BlockedStatusPath)
-	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
-	assert.False(t, blocked)
-
-	blocked, err = chefUpdater.BlockSensor("7777")
-	assert.Error(t, err)
-	assert.False(t, blocked)
-}
-
-func TestBlockAllSensors(t *testing.T) {
-	chefUpdater, err := NewChefUpdater(ChefUpdaterConfig{
-		AccessKey:         testPEMKey,
-		Name:              "test",
-		SensorUUIDPath:    "org/uuid",
-		BlockedStatusPath: "org/blocked",
-	})
-	assert.NoError(t, err)
-
-	chefUpdater.nodes = bootstrapSensorsDB()
-
-	errs := chefUpdater.BlockAllSensors()
-	assert.Equal(t, 2, len(errs))
 
 	var attributes map[string]interface{}
 	var ok bool
@@ -159,7 +131,15 @@ func TestBlockAllSensors(t *testing.T) {
 		chefUpdater.nodes["0"].NormalAttributes,
 		chefUpdater.BlockedStatusPath)
 
+	errs := chefUpdater.BlockOrganization("abcde", 123)
+	assert.Equal(t, 2, len(errs))
+
 	assert.NoError(t, err)
+	assert.False(t, attributes["blocked"].(bool))
+
+	errs = chefUpdater.BlockOrganization("abcde", 999)
+	assert.Equal(t, 2, len(errs))
+
 	assert.True(t, attributes["blocked"].(bool))
 
 	attributes, err = getParent(
@@ -175,7 +155,7 @@ func TestBlockAllSensors(t *testing.T) {
 		chefUpdater.BlockedStatusPath)
 
 	assert.NoError(t, err)
-	assert.True(t, attributes["blocked"].(bool))
+	assert.False(t, attributes["blocked"].(bool))
 
 	attributes, err = getParent(
 		chefUpdater.nodes["3"].NormalAttributes,
@@ -194,7 +174,7 @@ func TestResetSensors(t *testing.T) {
 			Name:                 "test",
 			SensorUUIDPath:       "org/uuid",
 			BlockedStatusPath:    "org/blocked",
-			OrganizationUUIDPath: "organization_uuid",
+			OrganizationUUIDPath: "org/organization_uuid",
 		},
 	}
 
@@ -207,10 +187,40 @@ func TestResetSensors(t *testing.T) {
 		chefUpdater.BlockedStatusPath)
 	assert.NoError(t, err)
 
-	attributes0["blocked"] = true
-	attributes2["blocked"] = true
+	chefUpdater.ResetAllSensors()
 
-	chefUpdater.ResetSensors("abcde")
+	assert.True(t, attributes0["blocked"].(bool))
+	assert.True(t, attributes2["blocked"].(bool))
+}
+
+func TestAllowLicense(t *testing.T) {
+	chefUpdater := &ChefUpdater{
+		nodes: bootstrapSensorsDB(),
+		ChefUpdaterConfig: ChefUpdaterConfig{
+			AccessKey:            testPEMKey,
+			Name:                 "test",
+			SensorUUIDPath:       "org/uuid",
+			BlockedStatusPath:    "org/blocked",
+			OrganizationUUIDPath: "org/organization_uuid",
+			LicenseUUIDPath:      "org/license_uuid",
+		},
+	}
+
+	chefUpdater.ResetAllSensors()
+	chefUpdater.AllowLicense("0000000000")
+
+	attributes0, err := getParent(
+		chefUpdater.nodes["0"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+	assert.NoError(t, err)
+	_, err = getParent(
+		chefUpdater.nodes["1"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+	assert.Error(t, err)
+	attributes2, err := getParent(
+		chefUpdater.nodes["2"].NormalAttributes,
+		chefUpdater.BlockedStatusPath)
+	assert.NoError(t, err)
 
 	assert.False(t, attributes0["blocked"].(bool))
 	assert.True(t, attributes2["blocked"].(bool))
@@ -223,14 +233,14 @@ func TestUpdateNode(t *testing.T) {
 			AccessKey:        testPEMKey,
 			Name:             "test",
 			SensorUUIDPath:   "org/uuid",
-			ProductTypePath:  "org/device_id",
+			ProductTypePath:  "org/product_type",
 			SerialNumberPath: "org/serial_number",
 			IPAddressPath:    "org/ipaddress",
 		},
 	}
 
 	address := make(net.IP, 4)
-	err := chefUpdater.UpdateNode(address, "888888", 10, 224)
+	err := chefUpdater.UpdateNode(address, "888888", 10, 999)
 	assert.NoError(t, err)
 
 	attrs, err := getParent(chefUpdater.nodes["0"].NormalAttributes,
