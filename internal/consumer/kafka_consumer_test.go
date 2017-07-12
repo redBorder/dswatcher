@@ -329,7 +329,7 @@ func TestLimitsConsumer(t *testing.T) {
 			})
 		})
 
-		Convey("When a counters reset message is received", func() {
+		Convey("When a allowed licenses is received", func() {
 			events := make(chan kafka.Event, 1)
 			rdConsumer.On("Events").Return(events)
 			rdConsumer.On("Close").Return(nil)
@@ -338,7 +338,11 @@ func TestLimitsConsumer(t *testing.T) {
 				Value: []byte(
 					`{
 						 "monitor": "alert",
-						 "type": "counters_reset",
+						 "type": "allowed_licenses",
+						 "licenses": [
+						 		"7416ba90-926b-475f-a26e-53fe1a7e3c36",
+						  	"12341223-926b-475f-a26e-53fe1a7e3c36"
+							],
 						 "timestamp": 1489057426
 					 }`),
 			}
@@ -347,8 +351,17 @@ func TestLimitsConsumer(t *testing.T) {
 				messages, _ := consumer.ConsumeLimits()
 				msg := <-messages
 
-				_, ok := msg.(ResetSignal)
+				_, ok := msg.(ResetSensors)
 				So(ok, ShouldBeTrue)
+
+				msg = <-messages
+				uuid, ok := msg.(AllowLicense)
+				So(ok, ShouldBeTrue)
+				So(uuid.License, ShouldEqual, "7416ba90-926b-475f-a26e-53fe1a7e3c36")
+				msg = <-messages
+				uuid, ok = msg.(AllowLicense)
+				So(ok, ShouldBeTrue)
+				So(uuid.License, ShouldEqual, "12341223-926b-475f-a26e-53fe1a7e3c36")
 
 				consumer.Close()
 				rdConsumer.AssertExpectations(t)
