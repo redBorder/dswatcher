@@ -47,7 +47,6 @@ func bootstrapSensorsDB() map[string]*chef.Node {
 			"org": map[string]interface{}{
 				"uuid":              "0000",
 				"serial_number":     "888888",
-				"product_type":      "999",
 				"organization_uuid": "abcde",
 				"blocked":           false,
 				"license_uuid":      "0000000000",

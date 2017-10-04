@@ -174,7 +174,7 @@ func (cu *ChefUpdater) UpdateNode(
 	}
 
 	if nodeProductType, ok = attributes[pType]; !ok {
-		return errors.New("Sensor " + serialNumber + " does not have a Product Type")
+		nodeProductType = "999"
 	}
 
 	if nodeProductTypeStr, ok = nodeProductType.(string); !ok {
@@ -228,9 +228,12 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 		}
 
 		if attributes[org] == organization || organization == "*" {
-			nodeProductType, err :=
-				strconv.ParseUint(attributes[pType].(string), 10, 32)
+			nodeProductTypeStr, ok := attributes[pType].(string)
+			if !ok {
+				nodeProductTypeStr = "999"
+			}
 
+			nodeProductType, err := strconv.ParseUint(nodeProductTypeStr, 10, 32)
 			if err != nil || uint32(nodeProductType) == productType {
 				if err != nil {
 					errs = append(errs, errors.New(
