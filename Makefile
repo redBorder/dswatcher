@@ -5,7 +5,7 @@ MKL_BLUE?=	\033[034m
 MKL_CLR_RESET?=	\033[0m
 
 BIN=      dswatcher
-prefix?=  /usr/local
+prefix?=  $$DESTDIR/usr/local
 bindir?=	$(prefix)/bin
 
 build: vendor
@@ -52,3 +52,6 @@ vendor-clean:
 	rm -rf vendor/
 
 all: build tests coverage
+
+rpm: clean
+	$(MAKE) -C packaging/rpm
