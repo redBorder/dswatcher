@@ -34,7 +34,7 @@ export PARENT_BUILD=${PWD}
 export GOPATH=${PWD}/gopath
 export PATH=${GOPATH}:${PATH}
 cd $GOPATH/src/github.com/redBorder/dswatcher
-mkdir -p %{buildroot}/usr
+mkdir -p %{buildroot}/usr/bin
 prefix=%{buildroot}/usr make install
 mkdir -p %{buildroot}/usr/share/dswatcher
 mkdir -p %{buildroot}/etc/dswatcher
