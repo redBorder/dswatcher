@@ -34,8 +34,8 @@ export PARENT_BUILD=${PWD}
 export GOPATH=${PWD}/gopath
 export PATH=${GOPATH}:${PATH}
 cd $GOPATH/src/github.com/redBorder/dswatcher
-mkdir -p %{buildroot}/usr/local/bin
-DESTDIR=%{buildroot} make install
+mkdir -p %{buildroot}/usr/bin
+prefix=%{buildroot}/usr/bin make install
 mkdir -p %{buildroot}/usr/share/dswatcher
 mkdir -p %{buildroot}/etc/dswatcher
 install -D -m 644 dswatcher.service %{buildroot}/usr/lib/systemd/system/dswatcher.service
@@ -56,7 +56,7 @@ exit 0
 
 %files
 %defattr(755,root,root)
-/usr/local/bin/dswatcher
+/usr/bin/dswatcher
 %defattr(644,root,root)
 /usr/share/dswatcher/config.yml
 /usr/lib/systemd/system/dswatcher.service

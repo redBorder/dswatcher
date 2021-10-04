@@ -5,7 +5,7 @@ MKL_BLUE?=	\033[034m
 MKL_CLR_RESET?=	\033[0m
 
 BIN=      dswatcher
-prefix?=  $$DESTDIR/usr/local
+prefix?=    /usr/local
 bindir?=	$(prefix)/bin
 
 build: vendor
