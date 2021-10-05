@@ -32,3 +32,6 @@ _testmain.go
 # Coverage profiles
 coverage.out
 *.part
+
+pkgs
+SOURCES
