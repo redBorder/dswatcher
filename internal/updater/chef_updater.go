@@ -52,6 +52,7 @@ type ChefUpdaterConfig struct {
 	LicenseUUIDPath      string
 	DataBagName          string
 	DataBagItem          string
+	SkipSSL              bool
 }
 
 // ChefUpdater uses the Chef client API to update a sensor node with an IP
@@ -73,6 +74,7 @@ func NewChefUpdater(config ChefUpdaterConfig) (*ChefUpdater, error) {
 		Name:    updater.Name,
 		Key:     updater.AccessKey,
 		BaseURL: updater.URL,
+		SkipSSL: updater.SkipSSL,
 	})
 	if err != nil {
 		return nil, errors.New("Error creating client: " + err.Error())

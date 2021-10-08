@@ -120,6 +120,7 @@ func main() {
 		LicenseUUIDPath:      config.Updater.LicenseUUIDPath,
 		DataBagName:          config.Updater.DataBagName,
 		DataBagItem:          config.Updater.DataBagItem,
+		SkipSSL:              config.Updater.SkipSSL, 
 	})
 	if err != nil {
 		log.Fatal("Error creating Chef API client: " + err.Error())

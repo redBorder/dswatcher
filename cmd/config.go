@@ -54,6 +54,7 @@ type DynamicSensorsWatcherConfig struct {
 		DataBagItem          string `yaml:"data_bag_item"`
 		UpdateInterval       int64  `yaml:"update_interval_s"`
 		FetchInterval        int64  `yaml:"fetch_interval_s"`
+		SkipSSL              bool   `yaml:"skip_ssl"`
 	}
 }
 
