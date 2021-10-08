@@ -5,11 +5,12 @@ Release: %{__release}%{?dist}
 License: GNU AGPLv3
 URL: https://github.com/redBorder/dswatcher
 Source0: %{name}-%{version}.tar.gz
+Source1: librdkafka-devel-0.9.1-1.el7.centos.x86_64.rpm
+Source2: librdkafka1-0.9.1-1.el7.centos.x86_64.rpm
 
 BuildRequires: go glide
 BuildRequires:	rsync
-BuildRequires: librdkafka-devel
-
+BuildRequires: cyrus-sasl
 Requires: librdkafka1
 
 Summary: Dynamic Sensors Watcher
@@ -22,6 +23,8 @@ Group:   Development/Libraries/Go
 %setup -qn %{name}-%{version}
 
 %build
+rpm -ivh $RPM_SOURCE_DIR/librdkafka1-0.9.1-1.el7.centos.x86_64.rpm
+rpm -ivh $RPM_SOURCE_DIR/librdkafka-devel-0.9.1-1.el7.centos.x86_64.rpm
 export GOPATH=${PWD}/gopath
 export PATH=${GOPATH}:${PATH}
 mkdir -p $GOPATH/src/github.com/redBorder/dswatcher
