@@ -5,13 +5,14 @@ Release: %{__release}%{?dist}
 License: GNU AGPLv3
 URL: https://github.com/redBorder/dswatcher
 Source0: %{name}-%{version}.tar.gz
-Source1: librdkafka-devel-0.9.1-1.el7.centos.x86_64.rpm
-Source2: librdkafka1-0.9.1-1.el7.centos.x86_64.rpm
 
-BuildRequires: go glide
+BuildRequires: go = 1.6.3
+BuildRequires: glide rsync gcc git
 BuildRequires:	rsync
-BuildRequires: cyrus-sasl
-Requires: librdkafka1
+BuildRequires: librd-devel = 0.1.0
+BuildRequires: librdkafka-devel = 0.9.1
+
+Requires: librd0 librdkafka1
 
 Summary: Dynamic Sensors Watcher
 Group:   Development/Libraries/Go
@@ -23,8 +24,15 @@ Group:   Development/Libraries/Go
 %setup -qn %{name}-%{version}
 
 %build
-rpm -ivh $RPM_SOURCE_DIR/librdkafka1-0.9.1-1.el7.centos.x86_64.rpm
-rpm -ivh $RPM_SOURCE_DIR/librdkafka-devel-0.9.1-1.el7.centos.x86_64.rpm
+git clone --branch v1.0.0-RC9 https://github.com/edenhill/librdkafka.git /tmp/librdkafka-v1.0.0-RC9
+cd /tmp/librdkafka-v1.0.0-RC9
+make uninstall
+./configure && make
+make install
+cd -
+ldconfig
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+ls /usr/local/lib/pkgconfig
 export GOPATH=${PWD}/gopath
 export PATH=${GOPATH}:${PATH}
 mkdir -p $GOPATH/src/github.com/redBorder/dswatcher
@@ -36,6 +44,7 @@ make
 export PARENT_BUILD=${PWD}
 export GOPATH=${PWD}/gopath
 export PATH=${GOPATH}:${PATH}
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 cd $GOPATH/src/github.com/redBorder/dswatcher
 mkdir -p %{buildroot}/usr/bin
 prefix=%{buildroot}/usr make install
