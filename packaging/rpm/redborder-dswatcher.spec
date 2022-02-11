@@ -1,4 +1,4 @@
-Name:    dswatcher
+Name:    redborder-dswatcher
 Version: %{__version}
 Release: %{__release}%{?dist}
 
@@ -47,19 +47,19 @@ export PKG_CONFIG_PATH=/usr/lib64/pkgconfig
 cd $GOPATH/src/github.com/redBorder/dswatcher
 mkdir -p %{buildroot}/usr/bin
 prefix=%{buildroot}/usr PKG_CONFIG_PATH=/usr/lib/pkgconfig/ make install
-mkdir -p %{buildroot}/usr/share/dswatcher
-mkdir -p %{buildroot}/etc/dswatcher
-install -D -m 644 dswatcher.service %{buildroot}/usr/lib/systemd/system/dswatcher.service
-install -D -m 644 packaging/rpm/config.yml %{buildroot}/usr/share/dswatcher
+mkdir -p %{buildroot}/usr/share/redborder-dswatcher
+mkdir -p %{buildroot}/etc/redborder-dswatcher
+install -D -m 644 redborder-dswatcher.service %{buildroot}/usr/lib/systemd/system/redborder-dswatcher.service
+install -D -m 644 packaging/rpm/config.yml %{buildroot}/usr/share/redborder-dswatcher
 
 %clean
 rm -rf %{buildroot}
 
 %pre
-getent group dswatcher >/dev/null || groupadd -r dswatcher
-getent passwd dswatcher >/dev/null || \
-    useradd -r -g dswatcher -d / -s /sbin/nologin \
-    -c "User of dswatcher service" dswatcher
+getent group redborder-dswatcher >/dev/null || groupadd -r redborder-dswatcher
+getent passwd redborder-dswatcher >/dev/null || \
+    useradd -r -g redborder-dswatcher -d / -s /sbin/nologin \
+    -c "User of redborder-dswatcher service" redborder-dswatcher
 exit 0
 
 %post -p /sbin/ldconfig
@@ -67,10 +67,10 @@ exit 0
 
 %files
 %defattr(755,root,root)
-/usr/bin/dswatcher
+/usr/bin/redborder-dswatcher
 %defattr(644,root,root)
-/usr/share/dswatcher/config.yml
-/usr/lib/systemd/system/dswatcher.service
+/usr/share/redborder-dswatcher/config.yml
+/usr/lib/systemd/system/redborder-dswatcher.service
 
 %changelog
 * Mon Oct 04 2021 Miguel Negrón <manegron@redborder.com> & David Vanhoucke <dvanhoucke@redborder.com> - 1.0.0-1

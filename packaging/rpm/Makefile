@@ -1,4 +1,4 @@
-PACKAGE_NAME?=	dswatcher
+PACKAGE_NAME?=	redborder-dswatcher
 
 VERSION?=	$(shell git describe --abbrev=6 --tags HEAD --always | sed 's/-/_/g')
 
@@ -33,7 +33,7 @@ srpm: build_prepare
 		--define "__release $(BUILD_NUMBER)" \
 		--resultdir=$(RESULT_DIR) \
 		--buildsrpm \
-		--spec=dswatcher.spec \
+		--spec=redborder-dswatcher.spec \
 		--sources=SOURCES
 	@echo "======= Source RPM now available in $(RESULT_DIR) ======="
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=Dynamic Sensor Watcher
+
+[Service]
+ExecStart=/usr/bin/redborder-dswatcher -config /etc/redborder-dswatcher/config.yml
+Restart=always
+User=redborder-dswatcher
+Group=redborder-dswatcher
+
+[Install]
+WantedBy=multi-user.target
