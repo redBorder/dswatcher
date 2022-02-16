@@ -64,6 +64,7 @@ exit 0
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
+systemctl daemon-reload
 
 %files
 %defattr(755,root,root)
