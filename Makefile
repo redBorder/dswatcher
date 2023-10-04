@@ -36,13 +36,10 @@ coverage:
 	@grep -h -v "mode: count" *.part >> coverage.out
 	@go tool cover -func coverage.out
 
-GLIDE := $(shell command -v glide 2> /dev/null)
 vendor:
-ifndef GLIDE
-	$(error glide is not installed)
-endif
-	@printf "$(MKL_BLUE)[DEPS]$(MKL_CLR_RESET)  Resolving dependencies\n"
-	@glide install
+	@go mod init
+	@go mod tidy
+	@go mod vendor
 
 clean:
 	rm -f $(BIN)
