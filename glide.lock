@@ -13,7 +13,7 @@ imports:
   version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
 - name: github.com/mgutz/ansi
   version: 9520e82c474b0a04dd04f8a40959027271bab992
-- name: github.com/Sirupsen/logrus
+- name: github.com/sirupsen/logrus
   version: 68cec9f21fbf3ea8d8f98c044bc6ce05f17b267a
 - name: github.com/tehmaze/netflow
   version: 3262c0d46619ea505a794c10459d23107dd8b34a
