@@ -70,7 +70,7 @@ case "$1" in
 esac
 
 %postun
-if [ "$1" -ge 1 ]; then
+if [ "$1" -eq 0 ]; then
   /sbin/ldconfig
 fi
 
