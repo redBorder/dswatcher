@@ -19,11 +19,17 @@ package updater
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
 	"github.com/go-chef/chef"
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	log = logrus.New()
 )
 
 ///////////////
@@ -131,12 +137,17 @@ func (cu *ChefUpdater) FetchNodes() error {
 			return errors.New("Error getting node info: " + err.Error())
 		}
 
-		attributes, err := getParent(node.NormalAttributes, cu.SerialNumberPath)
+		// Ensure redborder.blocked exists
+		cu.ensureBlockedField(n, &node)
+
+		// Get parent of sensor UUID path
+		parentAttrs, err := getParent(node.NormalAttributes, cu.SensorUUIDPath)
 		if err != nil {
-			return errors.New("Error getting node info: " + err.Error())
+			return fmt.Errorf("Failed to get parent attributes for node %s: %v", n, err)
 		}
 
-		sensorUUID, ok := attributes[getKeyFromPath(cu.SensorUUIDPath)].(string)
+		sensorKey := getKeyFromPath(cu.SensorUUIDPath)
+		sensorUUID, ok := parentAttrs[sensorKey].(string)
 		if !ok {
 			continue
 		}
@@ -223,6 +234,8 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 	pType := getKeyFromPath(cu.ProductTypePath)
 
 	for _, node := range cu.nodes {
+		log.Infof("Blocking node: %s", node.Name)
+
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
 		if err != nil {
 			errs = append(errs, err)
@@ -238,20 +251,22 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 			nodeProductType, err := strconv.ParseUint(nodeProductTypeStr, 10, 32)
 			if err != nil || uint32(nodeProductType) == productType {
 				if err != nil {
-					errs = append(errs, errors.New(
-						"Blocking sensor with unknown product type"),
-					)
+					errs = append(errs, errors.New("Blocking sensor with unknown product type"))
 				}
 
 				attributes[blocked] = true
 
 				if cu.client != nil {
-					cu.client.Nodes.Put(*node)
+					_, err := cu.client.Nodes.Put(*node)
+					if err != nil {
+						errs = append(errs, err)
+					} else {
+						log.Infof("Successfully blocked and updated node %s", node.Name)
+					}
 				}
 			}
 		}
 	}
-
 	return errs
 }
 
@@ -306,18 +321,27 @@ func (cu *ChefUpdater) ResetAllSensors() error {
 // node and returns the inner object given a path
 func getParent(root map[string]interface{}, path string) (map[string]interface{}, error) {
 	keys := strings.Split(path, "/")
-	var ok bool
-
-	attrs := root
-	for i, key := range keys {
-		if i < len(keys)-1 {
-			if attrs, ok = attrs[key].(map[string]interface{}); !ok || attrs == nil {
-				return nil, errors.New("Cannot find key: " + path)
-			}
-		}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("invalid path: %q", path)
 	}
 
-	return attrs, nil
+	current := root
+
+	for _, key := range keys[:len(keys)-1] {
+		next, ok := current[key]
+		if !ok {
+			return nil, fmt.Errorf("key %q not found in path %q", key, path)
+		}
+
+		nextMap, ok := next.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("expected map[string]interface{} at key %q but got %T", key, next)
+		}
+
+		current = nextMap
+	}
+
+	return current, nil
 }
 
 func findNode(keyPath string, value string, nodes map[string]*chef.Node,
@@ -341,4 +365,22 @@ func findNode(keyPath string, value string, nodes map[string]*chef.Node,
 func getKeyFromPath(path string) string {
 	keys := strings.Split(path, "/")
 	return keys[len(keys)-1]
+}
+
+// Create blocked (redborder -> blocked) field if it doesn't exist in the passed node as parameter
+func (cu *ChefUpdater) ensureBlockedField(n string, node *chef.Node) {
+	redborderAttrs, ok := node.NormalAttributes["redborder"].(map[string]interface{})
+	if !ok || redborderAttrs == nil {
+		redborderAttrs = make(map[string]interface{})
+		node.NormalAttributes["redborder"] = redborderAttrs
+	}
+
+	if _, exists := redborderAttrs["blocked"]; !exists {
+		log.Infof("Adding missing 'blocked: false' field to node %s", n)
+		redborderAttrs["blocked"] = false
+
+		if _, err := cu.client.Nodes.Put(*node); err != nil {
+			log.Errorf("Failed to update node %s: %v", n, err)
+		}
+	}
 }
