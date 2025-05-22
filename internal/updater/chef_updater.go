@@ -275,7 +275,6 @@ func (cu *ChefUpdater) BlockOrganization(organization string, productType uint32
 func (cu *ChefUpdater) AllowLicense(license string) []error {
 	var errs []error
 	blocked := getKeyFromPath(cu.BlockedStatusPath)
-	lic := getKeyFromPath(cu.LicenseUUIDPath)
 
 	for _, node := range cu.nodes {
 		attributes, err := getParent(node.NormalAttributes, cu.BlockedStatusPath)
@@ -284,12 +283,10 @@ func (cu *ChefUpdater) AllowLicense(license string) []error {
 			continue
 		}
 
-		if attributes[lic] == license {
-			attributes[blocked] = false
+		attributes[blocked] = false
 
-			if cu.client != nil {
-				cu.client.Nodes.Put(*node)
-			}
+		if cu.client != nil {
+			cu.client.Nodes.Put(*node)
 		}
 	}
 
