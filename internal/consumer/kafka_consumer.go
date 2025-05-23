@@ -128,9 +128,9 @@ func (kc *KafkaConsumer) ConsumeNetflow() (chan FlowData, chan string) {
 // "messages" channel receives actual messages and "info" channel receives
 // notifications from the Kafka broker.
 //
-// - "limit_reached": All sensors belonging to an organization are blocked.
-// - "allowed_licenses": All sensors are blocked and the only the sensors
-// 	 with a valid license are allowed.
+//   - "limit_reached": All sensors belonging to an organization are blocked.
+//   - "allowed_licenses": All sensors are blocked and the only the sensors
+//     with a valid license are allowed.
 func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 	messages := make(chan Message)
 	inputMessages, info := receiveLoop(kc.LimitsConsumer, kc.terminate)
@@ -148,6 +148,10 @@ func (kc *KafkaConsumer) ConsumeLimits() (chan Message, chan string) {
 
 			switch data.Type {
 			case "limit_reached":
+				messages <- BlockOrganization(data.UUID)
+
+			// If the license/s are empty or expired
+			case "unknown_uuid":
 				messages <- BlockOrganization(data.UUID)
 
 			case "allowed_licenses":
