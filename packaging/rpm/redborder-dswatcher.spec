@@ -12,6 +12,8 @@ Requires: librd0 librdkafka
 Summary: Dynamic Sensors Watcher
 Group:   Development/Libraries/Go
 
+%global debug_package %{nil}
+
 %description
 %{summary}
 
@@ -53,9 +55,24 @@ getent passwd redborder-dswatcher >/dev/null || \
     -c "User of redborder-dswatcher service" redborder-dswatcher
 exit 0
 
-%post -p /sbin/ldconfig
-%postun -p /sbin/ldconfig
+%post
+/sbin/ldconfig
 systemctl daemon-reload
+case "$1" in
+  1)
+    # Initial install
+    :
+  ;;
+  2)
+    # Upgrade: Try to restart only if it was running to apply new config
+    systemctl try-restart redborder-dswatcher.service >/dev/null 2>&1 || :
+  ;;
+esac
+
+%postun
+if [ "$1" -eq 0 ]; then
+  /sbin/ldconfig
+fi
 
 %files
 %defattr(755,root,root)
@@ -65,6 +82,8 @@ systemctl daemon-reload
 /usr/lib/systemd/system/redborder-dswatcher.service
 
 %changelog
+* Tue May 20 2025 Rafael Gómez <rgomez@redborder.com> - 3.0.0-1
+- Disable debug package creation and restarting redborder-dswatcher.service when upgrading to apply new config.
 * Wed Oct 04 2023 David Vanhoucke <dvanhoucke@redborder.com> - 2.0.0-1
 - adapt for go mod
 * Mon Oct 04 2021 Miguel Negrón <manegron@redborder.com> & David Vanhoucke <dvanhoucke@redborder.com> - 1.0.0-1
