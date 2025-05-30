@@ -26,10 +26,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/redBorder/dswatcher/internal/consumer"
 	"github.com/redBorder/dswatcher/internal/decoder"
 	"github.com/redBorder/dswatcher/internal/updater"
+	"github.com/sirupsen/logrus"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
@@ -120,7 +120,7 @@ func main() {
 		LicenseUUIDPath:      config.Updater.LicenseUUIDPath,
 		DataBagName:          config.Updater.DataBagName,
 		DataBagItem:          config.Updater.DataBagItem,
-		SkipSSL:              config.Updater.SkipSSL, 
+		SkipSSL:              config.Updater.SkipSSL,
 	})
 	if err != nil {
 		log.Fatal("Error creating Chef API client: " + err.Error())
